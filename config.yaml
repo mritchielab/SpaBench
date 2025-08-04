@@ -1,0 +1,100 @@
+# config.yaml
+
+# Samples to process
+samples:
+  - Human_DLPFC_151507
+
+# Available normalization methods
+normalizations:
+  - LogNormalize
+  - SCTransform
+  - RC
+  - CLR
+
+# Default parameters for LogNormalize
+normalize:
+  method: LogNormalize
+  scale_factor: 10000
+
+# Default parameters for SCTransform
+sctransform:
+  assay: Spatial
+
+# Available feature‐selection methods
+#feature_methods:
+#  - vst             # Seurat FindVariableFeatures(selection.method="vst")
+#  - markvariogram   # Seurat FindSpatiallyVariableFeatures(method="markvariogram")
+#  - moransi         # Seurat FindSpatiallyVariableFeatures(method="moransi")
+#  - nnSVG           # Seurat nnSVG
+# Parameters for vst
+#features:
+#  n_features: 2000
+
+features:
+  methods:
+    - vst
+    - mvp               # Seurat - selection.method="mean.var.plot"
+    - disp              # Seurat - selection.method="dispersion"
+    - markvariogram
+    - moransi
+    - nnSVG
+    - SPARK
+    - SPARK-X
+  n_features: 2000
+
+# Available dimensionality‐reduction methods
+# (we use PCA and UMAP in a combined script)
+reduction_methods:
+  - PCA
+  - UMAP
+
+# PCA parameters
+pca:
+  npcs: 30
+
+# Available clustering algorithms
+algorithms:
+  louvain: 1
+  louvain_refine: 2
+  SLM: 3
+  leiden: 4
+  BANKSY: 99   # SPECIAL: BANKSY will be handled by cluster_BANKSY rule
+  BayesSpace: 10    # special: handled by cluster_BayesSpace
+  SpaGCN: null      # handled by cluster_SpaGCN
+  SpatialPCA: null      
+
+# Clustering parameters
+clustering:
+  resolution: 0.5   # generic resolution for Seurat clustering
+  nrep: 1000        # BayesSpace MCMC repetitions
+  burn_in: 100      # BayesSpace MCMC burn-in
+  q: 10             # BayesSpace number of clusters
+  lambda: 0.8       # Banksy-specific λ
+  k_geom: 50        # Banksy-specific k_geom
+
+# SpaGCN-specific parameters
+SpaGCN:
+  n_clusters: 10
+  beta: 49
+  alpha: 1
+  refine: true
+  histology: false
+
+# stLearn–specific parameters
+stlearn:
+  # 当使用 Louvain 时构建邻接图的 neighbors 数目
+  n_neighbors: 10
+  n_pcs: 50
+  resolution: 1.0
+  use_morphology: true
+
+# SpatialPCA–specific parameters
+SpatialPCA:
+  n_clusters: 10      # desired number of clusters
+  refine: false       # if true, set fast=FALSE; if false, fast=TRUE
+
+# Visualization / metrics summary
+metrics_summary:
+  plot_width: 16
+  plot_height: 14
+
