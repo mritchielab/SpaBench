@@ -79,17 +79,25 @@ completeness <- function(true, pred) {
   sum(apply(tbl,2,max)) / length(true)
 }
 # CHAOS：对每个 cluster，计算同一 cluster 内所有 spot 两两距离之和，最后加总
-compute_chaos <- function(coords, labels) {
-  chaos <- 0
-  for(cl in unique(labels)) {
+compute_chaos <- function(coords, labels, k = 1) {
+  N <- length(labels)
+  total_dist <- 0
+  
+  for (cl in unique(labels)) {
     idx <- which(labels == cl)
-    if(length(idx) > 1) {
-      d <- as.matrix(dist(coords[idx, ]))
-      chaos <- chaos + sum(d[upper.tri(d)])
-    }
+    if (length(idx) <= k) next
+    
+    sub_coords <- coords[idx, , drop = FALSE]
+    # get.knn 返回最近 k 个邻居的距离矩阵
+    nn <- get.knn(sub_coords, k = k)
+    # nn$nn.dist 是一个 m × k 矩阵，m = nrow(sub_coords)
+    # 把所有这些距离加起来
+    total_dist <- total_dist + sum(nn$nn.dist)
   }
-  chaos
+  
+  return(total_dist / N)
 }
+
 # PAS：对每个 spot 看它 10 最近邻中，与它标签不同的数量是否 ≥6
 compute_pas <- function(coords, labels, k = 10, threshold = 6) {
   # 得到一个 n × k 的矩阵 nn_idx，行号是 spot，内容是它的 k 个邻居
@@ -173,7 +181,8 @@ metrics_list <- lapply(truth_cols, function(tc) {
           )
        } else if ("stlearn" %in% colnames(seu@meta.data)) {
           coords <- as.matrix(
-            seu@meta.data[ merged$barcode, c("imagecol", "imagecol") ]
+            # 
+            seu@meta.data[ merged$barcode, c("array_row", "array_col") ]
           )
       } else {
           # normal workflows within Seurat then use images slot
