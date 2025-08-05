@@ -4,11 +4,23 @@ SpaBench is a comprehensive spatial transcriptomics benchmarking workflow which 
 ## To run the whole workflow
 ```
 module load snakemake
-snakemake -j 36
+snakemake -j 16
 ```
 
 ## To run specific branch of workflow
 ```
-snakemake -j60 -p -n   /path/todata/{CLR,LogNormalize,RC,SCTransform}/{vst,mvp,disp,markvariogram,moransi,nnSVG,SPARK,SPARK-X}/SpaGCN/06_SpaGCN_clustered.rds
+snakemake -j 16 -p -n   /pathtodata/{CLR,LogNormalize,RC,SCTransform}/{vst,mvp,disp,markvariogram,moransi,nnSVG,SPARK,SPARK-X}/SpaGCN/06_SpaGCN_clustered.rds
 ```
+
+## To run particular steps
+```
+snakemake data/CLR/nnSVG/BayesSpace/06_BayesSpace_clustered.rds -j 16 -p --allowed-rules cluster_BayesSpace 
+```
+
+## To run cell type / spatial domain annotation with QC metrics computation
+```
+snakemake   $(find results/data -type f -name "07_*_clusters.csv" \
+     | sed -e 's#/07_\(.*\)_clusters.csv#/09_\1_metrics.csv#')   --cores 16 -p --allowed-rules compute_metrics
+```
+
 
