@@ -23,7 +23,8 @@ snakemake   $(find results/data -type f -name "07_*_clusters.csv" \
      | sed -e 's#/07_\(.*\)_clusters.csv#/09_\1_metrics.csv#')   --cores 16 -p --allowed-rules compute_metrics
 ```
 
-## Snakemake can automatically determine which parts of the workflow can be run in parallel. By specifying more than one available core:
+## Resource Management
+Snakemake can automatically determine which parts of the workflow can be run in parallel. By specifying more than one available core:
 ```
 snakemake --cores 16 /pathtodata/{CLR,LogNormalize,RC,SCTransform}/{vst,mvp,disp,markvariogram,moransi,nnSVG,SPARK,SPARK-X}/{BANKSY, BayesSpace. leiden, louvain, louvain_refine, SLM, SpatialPCA, stlearn, SpaGCN}/06_*_clustered.rds
 ```
