@@ -29,3 +29,6 @@ Snakemake can automatically determine which parts of the workflow can be run in 
 ```
 snakemake --cores 16 /pathtodata/{CLR,LogNormalize,RC,SCTransform}/{vst,mvp,disp,markvariogram,moransi,nnSVG,SPARK,SPARK-X}/{BANKSY, BayesSpace. leiden, louvain, louvain_refine, SLM, SpatialPCA, stlearn, SpaGCN}/06_*_clustered.rds
 ```
+## Before running this workflow:
+### Input data format
+Named as ```01_raw_seurat.rds``` under ```data/samplename/```
