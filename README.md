@@ -6,6 +6,7 @@ Using Snakemake, SpaBench is a comprehensive spatial transcriptomics benchmarkin
 | Algorithm | Functional Step | Language | Citation |
 | --- | --- | --- | --- |
 | `Seurat` | Object construction & Normalization & Feature selection & Dimensionality reduction & Clustering | R | [Hao et al. (2023)](https://www.nature.com/articles/s41587-023-01767-y)
+| `SPARK` & SPARK-X` | Feature selection | R | [Zhu et al. (2021)](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-021-02404-0)
 | `BANKSY` | Clustering | R & Python | [Singhal et al. (2023)](https://www.nature.com/articles/s41588-024-01664-3)
 | `BayesSpace` | Clustering | R | [Zhao et al. (2021)](https://www.nature.com/articles/s41587-021-00935-2)
 
