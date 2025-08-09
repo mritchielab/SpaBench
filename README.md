@@ -13,7 +13,7 @@ Using Snakemake, SpaBench is a comprehensive spatial transcriptomics benchmarkin
 | `nnSVG` | Feature selection | R | [Zhu et al. (2021)](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-021-02404-0)
 | `SpatialPCA` |  Dimensionality reduction & Clustering | R | [Shang et al. (2022)](https://www.nature.com/articles/s41467-022-34879-1)
 | `BANKSY` | Clustering | R & Python | [Singhal et al. (2023)](https://www.nature.com/articles/s41588-024-01664-3)
-| `stlearn` | Clustering | R & Python | [Pham et al. (2023)](https://www.nature.com/articles/s41467-023-43120-6 )
+| `stlearn` | Clustering | Python | [Pham et al. (2023)](https://www.nature.com/articles/s41467-023-43120-6 )
 | `BayesSpace` | Clustering | R | [Zhao et al. (2021)](https://www.nature.com/articles/s41587-021-00935-2)
 | `SpaGCN` | Clustering | Python | [Hu et al. (2021)](https://www.nature.com/articles/s41592-021-01255-8)
 
