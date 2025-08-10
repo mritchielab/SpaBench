@@ -16,6 +16,7 @@ Building upon Snakemake, SpaBench is a comprehensive spatial transcriptomics ben
 | `stlearn` | Clustering | Python | [Pham et al. (2023)](https://www.nature.com/articles/s41467-023-43120-6 )
 | `BayesSpace` | Clustering | R | [Zhao et al. (2021)](https://www.nature.com/articles/s41587-021-00935-2)
 | `SpaGCN` | Clustering | Python | [Hu et al. (2021)](https://www.nature.com/articles/s41592-021-01255-8)
+| `SingleR` | Annotation | R | [Aran et al. (2019)](https://www.nature.com/articles/s41590-018-0276-y)
 
 ## To run the whole workflow:
 ```
