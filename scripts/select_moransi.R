@@ -5,22 +5,22 @@ suppressPackageStartupMessages({
   library(ggplot2)
 })
 
-orig_f <- getFromNamespace("FindSpatiallyVariableFeatures.StdAssay", "Seurat")
-b <- body(orig_f)
-idx <- which(sapply(seq_along(b), function(i) {
-  expr_lines <- deparse(b[[i]])
-  any(grepl("object\\[names\\(x = svf.info\\)\\]", expr_lines))
-}))
-if (length(idx) != 1) {
-  stop("Check duplicated code!")
-}
-b[[idx]] <- quote(
-  object[[ names(x = svf.info) ]] <- svf.info
-)
-body(orig_f) <- b
-unlockBinding("FindSpatiallyVariableFeatures.StdAssay", asNamespace("Seurat"))
-assign("FindSpatiallyVariableFeatures.StdAssay", orig_f, asNamespace("Seurat"))
-lockBinding("FindSpatiallyVariableFeatures.StdAssay", asNamespace("Seurat"))
+#orig_f <- getFromNamespace("FindSpatiallyVariableFeatures.StdAssay", "Seurat")
+#b <- body(orig_f)
+#idx <- which(sapply(seq_along(b), function(i) {
+#  expr_lines <- deparse(b[[i]])
+#  any(grepl("object\\[names\\(x = svf.info\\)\\]", expr_lines))
+#}))
+#if (length(idx) != 1) {
+#  stop("Check duplicated code!")
+#}
+#b[[idx]] <- quote(
+#  object[[ names(x = svf.info) ]] <- svf.info
+#)
+#body(orig_f) <- b
+#unlockBinding("FindSpatiallyVariableFeatures.StdAssay", asNamespace("Seurat"))
+#assign("FindSpatiallyVariableFeatures.StdAssay", orig_f, asNamespace("Seurat"))
+#lockBinding("FindSpatiallyVariableFeatures.StdAssay", asNamespace("Seurat"))
 
 # Define command‐line options
 opt <- parse_args(OptionParser(option_list = list(
