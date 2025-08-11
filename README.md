@@ -18,6 +18,9 @@ Building upon Snakemake, SpaBench is a comprehensive spatial transcriptomics ben
 | `SpaGCN` | Clustering | Python | [Hu et al. (2021)](https://www.nature.com/articles/s41592-021-01255-8)
 | `SingleR` | Annotation | R | [Aran et al. (2019)](https://www.nature.com/articles/s41590-018-0276-y)
 
+## Parameter optimization and Post-processing strategy
+All algorithms in `SpaBench` include configurable parameters to help you obtain the optimal downstream results. The same options are available in the config file: by default `SpaBench` applies sensible defaults or the values suggested in the method tutorials from original authors, and you can change any parameter by editing the config. Users can perform parameter tuning through the config file. Common post-processing strategies and their configurable parameters are summarized in the table below.
+
 ## To run the whole workflow:
 ```
 module load snakemake
