@@ -52,3 +52,10 @@ snakemake --cores 16 /pathtodata/{CLR,LogNormalize,RC,SCTransform}/{vst,mvp,disp
 ## Before running this workflow:
 ### Input data format
 Named as ```01_raw_seurat.rds``` under ```data/samplename/```
+
+### Common bugs
+```
+MissingRuleException:
+No rule to produce .....
+```
+
