@@ -46,7 +46,7 @@ snakemake   $(find results/data -type f -name "07_*_clusters.csv" \
 
 ## To check result completeness:
 ```
-python check.py -s /path/to/data
+python scripts/check.py -s /path/to/data
 ```
 It then returns with the checking result if anything is missing from the 400 combinations. An example as below.
 ```
