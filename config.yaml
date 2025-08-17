@@ -10,6 +10,7 @@ normalizations:
   - SCTransform
   - RC
   - CLR
+  - SpaNorm
 
 # Default parameters for LogNormalize
 normalize:
@@ -58,10 +59,12 @@ algorithms:
   louvain_refine: 2
   SLM: 3
   leiden: 4
-  BANKSY: 99   # SPECIAL: BANKSY will be handled by cluster_BANKSY rule
-  BayesSpace: 10    # special: handled by cluster_BayesSpace
+  BANKSY: null   # SPECIAL: BANKSY will be handled by cluster_BANKSY rule
+  BayesSpace: null    # special: handled by cluster_BayesSpace
   SpaGCN: null      # handled by cluster_SpaGCN
-  SpatialPCA: null      
+  SpatialPCA: null  
+  SpatialLeiden: null
+  stlearn: null
 
 # Clustering parameters
 clustering:
