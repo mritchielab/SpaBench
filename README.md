@@ -44,6 +44,24 @@ snakemake   $(find results/data -type f -name "07_*_clusters.csv" \
      | sed -e 's#/07_\(.*\)_clusters.csv#/09_\1_metrics.csv#')   --cores 16 -p --allowed-rules compute_metrics
 ```
 
+## To check result completeness:
+```
+python check.py -s /path/to/data
+```
+It then returns with the checking result if anything is missing from the 400 combinations. An example as below.
+```
+============================================================
+Checked 400 expected '06_*_clustered.rds' files for 1 sample dir(s).
+  Found: 399    Missing: 1
+------------------------------------------------------------
+Sample dir: data/sample1
+  expected: 400, found: 399, missing: 1
+============================================================
+
+Missing files (first 200 shown):
+  data/sample1/LogNormalize/SPARK/leiden/06_leiden_clustered.rds
+```
+
 ## Resource Management
 Snakemake can automatically determine which parts of the workflow can be run in parallel. By specifying more than one available core:
 ```
