@@ -73,13 +73,13 @@ Named as ```01_raw_seurat.rds``` under ```data/samplename/```
 
 ### Common bugs
 1. Wrong arguments, the following bug means you probably put a wrong name that Snakefile cannot recognize.
-```
-snakemake data/CLR/nnSVG/leiden/06_louvain_clustered.rds -j 16 -p # leiden and louvain are inconsistent in this case
-MissingRuleException:
-No rule to produce .....
+```diff
+- snakemake data/CLR/nnSVG/leiden/06_louvain_clustered.rds -j 16 -p # leiden and louvain are inconsistent in this case
+- MissingRuleException:
+- No rule to produce .....
 ```
 2. Required inputs are missing, this usually happens when you use `--allowed-rules` but forgot to run previous steps.
-```
-MissingInputException in rule cluster_stlearn in file "./Snakefile", line 461:
-Missing input files for rule cluster_stlearn:...
+```diff
+- MissingInputException in rule cluster_stlearn in file "./Snakefile", line 461:
+- Missing input files for rule cluster_stlearn:...
 ```
