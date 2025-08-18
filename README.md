@@ -74,7 +74,8 @@ Named as ```01_raw_seurat.rds``` under ```data/samplename/```
 ### Common bugs
 1. Wrong arguments, the following bug means you probably put a wrong name that Snakefile cannot recognize.
 ```diff
-$${\color{red}snakemake data/CLR/nnSVG/leiden/06_louvain_clustered.rds -j 16 -p}$$ # leiden and louvain are inconsistent in this case
+# leiden and louvain are inconsistent in this case
+- snakemake data/CLR/nnSVG/leiden/06_louvain_clustered.rds -j 16 -p
 - MissingRuleException:
 - No rule to produce .....
 ```
