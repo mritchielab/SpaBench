@@ -79,7 +79,7 @@ Named as ```01_raw_seurat.rds``` under ```data/samplename/```
 - MissingRuleException:
 - No rule to produce .....
 ```
-2. Required inputs are missing, this usually happens when you use `--allowed-rules` but forgot to run previous steps.
+2. Missing required inputs, this usually happens when you use `--allowed-rules` but forgot to run previous steps.
 ```diff
 - MissingInputException in rule cluster_stlearn in file "./Snakefile", line 461:
 - Missing input files for rule cluster_stlearn:...
