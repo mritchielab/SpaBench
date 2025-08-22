@@ -69,7 +69,7 @@ snakemake --cores 16 /pathtodata/{CLR,LogNormalize,RC,SCTransform}/{vst,mvp,disp
 ```
 ## Before running this workflow, check the following information:
 ### Input data format
-Named as ```01_raw_seurat.rds``` under ```data/samplename/```
+Before running the downstream analysis, it is highly recommended to create spatial object under ```data/samplename/``` with format checking which can save plenty of time in format debugging. 
 
 ### Common bugs
 1. Wrong arguments, the following bug means you probably put a wrong name that Snakefile cannot recognize.
