@@ -3,6 +3,8 @@
 # Samples to process
 samples:
   - Human_DLPFC_151507
+# platform for sample: Visium, VisiumHD, Slideseq, Stereoseq
+platform: Visium
 
 # Available normalization methods
 normalizations:
