@@ -8,6 +8,50 @@ ALG     = config["algorithms"]
 
 ruleorder: cluster > cluster_BANKSY
 
+# 0. Prepare input data
+rule prepare_data:
+    output:
+        seurat = "data/{sample}/01_raw_seurat.rds",
+        anndata = "data/{sample}/01_raw_anndata.h5ad",
+        sc_anndata = "data/{sample}/01_sc_raw_anndata.h5ad"
+    params:
+        filename = lambda wc: config.get("raw_filename", "filtered_feature_bc_matrix.h5")
+    log: "logs/{sample}/prepare_data.log"
+    run:
+        import os, shlex
+        sample = wildcards.sample
+        data_dir = f"data/{sample}/"
+        filename = params.filename
+
+        # platform: per-sample override or global
+        platform = config.get("sample_platforms", {}).get(sample, config.get("platform", "Visium"))
+
+        want_seurat = "seurat" in output and output.seurat not in input and not os.path.exists(output.seurat)
+        want_anndata = "anndata" in output and output.anndata not in input and not os.path.exists(output.anndata)
+        want_sc_anndata = "sc_anndata" in output and output.sc_anndata not in input and not os.path.exists(output.sc_anndata)
+
+        def run_cmd(cmd):
+            print("> " + cmd)
+            shell(cmd)
+
+        # create directories
+        os.makedirs(data_dir, exist_ok=True)
+        if want_seurat:
+            os.makedirs(os.path.dirname(output.seurat), exist_ok=True)
+            cmd = f"{RSCRIPT} scripts/prepare_seurat.R --data_dir {shlex.quote(data_dir)} --filename {shlex.quote(filename)} --out {shlex.quote(output.seurat)} --platform {shlex.quote(platform)}"
+            run_cmd(cmd)
+        if want_anndata:
+            os.makedirs(os.path.dirname(output.anndata), exist_ok=True)
+            cmd = f"python scripts/prepare_anndata.py --mode raw --data_dir {shlex.quote(data_dir)} --filename {shlex.quote(filename)} --out {shlex.quote(output.anndata)} --platform {shlex.quote(platform)}"
+            run_cmd(cmd)
+        if want_sc_anndata:
+            os.makedirs(os.path.dirname(output.sc_anndata), exist_ok=True)
+            cmd = f"python scripts/prepare_anndata.py --mode sc --data_dir {shlex.quote(data_dir)} --filename {shlex.quote(filename)} --out {shlex.quote(output.sc_anndata)} --platform {shlex.quote(platform)}"
+            run_cmd(cmd)
+
+        with open(log, "a") as lf:
+            lf.write(f"prepare_data: sample={sample}, platform={platform}, want_seurat={want_seurat}, want_anndata={want_anndata}, want_sc_anndata={want_sc_anndata}\n")
+
 # 1. normalization step for LogNormalize
 rule normalize_log:
     input:
