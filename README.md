@@ -70,7 +70,9 @@ snakemake --cores 16 /pathtodata/{CLR,LogNormalize,RC,SCTransform}/{vst,mvp,disp
 ## Before running this workflow, check the following information:
 ### Input data format
 Before running the downstream analysis, it is highly recommended to create spatial object using: 
-``` snakemake -j 8 -p  data/sample/01_raw_seurat.rds```
+``` 
+snakemake -j 8 -p  data/sample/01_raw_seurat.rds
+```
 And check data format which can save plenty of time in format debugging. 
 
 ### Common bugs
