@@ -69,7 +69,7 @@ snakemake --cores 16 /pathtodata/{CLR,LogNormalize,RC,SCTransform}/{vst,mvp,disp
 ```
 ## Before running this workflow, check the following information:
 ### Input data format
-Before running the downstream analysis, it is highly recommended to create spatial object using ``` snakemake -j20 -p  data/Mouse_embryo_stereoseq/01_raw_seurat.rds``` with format checking which can save plenty of time in format debugging. 
+Before running the downstream analysis, it is highly recommended to create spatial object using ``` snakemake -j 8 -p  data/sample/01_raw_seurat.rds``` with format checking which can save plenty of time in format debugging. 
 
 ### Common bugs
 1. Wrong arguments, the following bug means you probably put a wrong name that Snakefile cannot recognize.
