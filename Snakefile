@@ -9,48 +9,71 @@ ALG     = config["algorithms"]
 ruleorder: cluster > cluster_BANKSY
 
 # 0. Prepare input data
-rule prepare_data:
+# ===== prepare_seurat: Seurat .rds =====
+rule prepare_seurat:
     output:
-        seurat = "data/{sample}/01_raw_seurat.rds",
+        seurat = "data/{sample}/01_raw_seurat.rds"
+    params:
+        filename = detect_raw_filename,
+        tech_platform = lambda wc: config.get("sample_platforms", {}).get(wc.sample, config.get("platform", "Visium")),
+        rscript = RSCRIPT
+    log: "logs/{sample}/prepare_seurat.log"
+    shell:
+        r"""
+        mkdir -p data/{wildcards.sample} $(dirname {output.seurat}) $(dirname {log})
+        echo "prepare_seurat start: {wildcards.sample} {params.tech_platform} {params.filename}" > {log} 2>&1
+
+        plat=$(echo '{params.tech_platform}' | tr '[:upper:]' '[:lower:]')
+        case "$plat" in
+            stereoseq) plat="StereoSeq" ;;
+            slideseq) plat="SlideSeq" ;;
+            visium*|visiumhd) plat="Visium" ;;
+            *) plat="{params.tech_platform}" ;;
+        esac
+
+        fname="data/{wildcards.sample}/{params.filename}"
+        if [ ! -e "$fname" ] && [ -e "{params.filename}" ]; then
+            fname="{params.filename}"
+        fi
+
+        {params.rscript} scripts/prepare_seurat.R --data_dir data/{wildcards.sample} --filename "$fname" --out {output.seurat} --platform "$plat" >> {log} 2>&1 || (echo "Seurat step failed, showing log:" >&2; cat {log} >&2; exit 1)
+        echo "prepare_seurat done" >> {log} 2>&1
+        """
+
+# ===== prepare_anndata: anndata（raw & sc） =====
+rule prepare_anndata:
+    output:
         anndata = "data/{sample}/01_raw_anndata.h5ad",
         sc_anndata = "data/{sample}/01_sc_raw_anndata.h5ad"
     params:
-        filename = lambda wc: config.get("raw_filename", "filtered_feature_bc_matrix.h5")
-    log: "logs/{sample}/prepare_data.log"
-    run:
-        import os, shlex
-        sample = wildcards.sample
-        data_dir = f"data/{sample}/"
-        filename = params.filename
+        filename = detect_raw_filename,
+        tech_platform = lambda wc: config.get("sample_platforms", {}).get(wc.sample, config.get("platform", "Visium")),
+    log: "logs/{sample}/prepare_anndata.log"
+    shell:
+        r"""
+        mkdir -p data/{wildcards.sample} $(dirname {output.anndata}) $(dirname {output.sc_anndata}) $(dirname {log})
+        echo "prepare_anndata start: {wildcards.sample} {params.tech_platform} {params.filename}" > {log} 2>&1
 
-        # platform: per-sample override or global
-        platform = config.get("sample_platforms", {}).get(sample, config.get("platform", "Visium"))
+        plat=$(echo '{params.tech_platform}' | tr '[:upper:]' '[:lower:]')
+        case "$plat" in
+            stereoseq) plat="StereoSeq" ;;
+            slideseq) plat="SlideSeq" ;;
+            visium*|visiumhd) plat="Visium" ;;
+            *) plat="{params.tech_platform}" ;;
+        esac
 
-        want_seurat = "seurat" in output and output.seurat not in input and not os.path.exists(output.seurat)
-        want_anndata = "anndata" in output and output.anndata not in input and not os.path.exists(output.anndata)
-        want_sc_anndata = "sc_anndata" in output and output.sc_anndata not in input and not os.path.exists(output.sc_anndata)
+        fname="data/{wildcards.sample}/{params.filename}"
+        if [ ! -e "$fname" ] && [ -e "{params.filename}" ]; then
+            fname="{params.filename}"
+        fi
 
-        def run_cmd(cmd):
-            print("> " + cmd)
-            shell(cmd)
+        # prepare_anndata.py expects filename as basename (it will join data_dir)
+        fname_basename=$(basename "$fname")
+        python scripts/prepare_anndata.py --mode raw --data_dir data/{wildcards.sample} --filename "$fname_basename" --out {output.anndata} --platform "$plat" >> {log} 2>&1 || (echo "AnnData raw failed, showing log:" >&2; cat {log} >&2; exit 1)
+        python scripts/prepare_anndata.py --mode sc  --data_dir data/{wildcards.sample} --filename "$fname_basename" --out {output.sc_anndata} --platform "$plat" >> {log} 2>&1 || (echo "AnnData sc failed, showing log:" >&2; cat {log} >&2; exit 1)
 
-        # create directories
-        os.makedirs(data_dir, exist_ok=True)
-        if want_seurat:
-            os.makedirs(os.path.dirname(output.seurat), exist_ok=True)
-            cmd = f"{RSCRIPT} scripts/prepare_seurat.R --data_dir {shlex.quote(data_dir)} --filename {shlex.quote(filename)} --out {shlex.quote(output.seurat)} --platform {shlex.quote(platform)}"
-            run_cmd(cmd)
-        if want_anndata:
-            os.makedirs(os.path.dirname(output.anndata), exist_ok=True)
-            cmd = f"python scripts/prepare_anndata.py --mode raw --data_dir {shlex.quote(data_dir)} --filename {shlex.quote(filename)} --out {shlex.quote(output.anndata)} --platform {shlex.quote(platform)}"
-            run_cmd(cmd)
-        if want_sc_anndata:
-            os.makedirs(os.path.dirname(output.sc_anndata), exist_ok=True)
-            cmd = f"python scripts/prepare_anndata.py --mode sc --data_dir {shlex.quote(data_dir)} --filename {shlex.quote(filename)} --out {shlex.quote(output.sc_anndata)} --platform {shlex.quote(platform)}"
-            run_cmd(cmd)
-
-        with open(log, "a") as lf:
-            lf.write(f"prepare_data: sample={sample}, platform={platform}, want_seurat={want_seurat}, want_anndata={want_anndata}, want_sc_anndata={want_sc_anndata}\n")
+        echo "prepare_anndata done" >> {log} 2>&1
+        """
 
 # 1. normalization step for LogNormalize
 rule normalize_log:
