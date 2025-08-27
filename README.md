@@ -88,3 +88,18 @@ And check data format which can save plenty of time in format debugging.
 - MissingInputException in rule cluster_stlearn in file "./Snakefile", line 461:
 - Missing input files for rule cluster_stlearn:...
 ```
+3. Incomplete results, this can happen when previous job fails.
+```diff
+-IncompleteFilesException:
+-The files below seem to be incomplete. If you are sure that certain files are not incomplete, mark them as complete with
+
+-    snakemake --cleanup-metadata <filenames>
+
+-To re-generate the files rerun your command with the --rerun-incomplete flag.
+-Incomplete files:
+-data/LogNormalize/moransi/03_moransi.rds
+```
+To address this
+```diff
++snakemake --cleanup-metadata data/LogNormalize/moransi/03_moransi.rds
+```
