@@ -39,6 +39,7 @@ seu <- readRDS(opt$input)
 # Ensure we're operating on the 'Spatial' assay, then scale the data
 #DefaultAssay(seu) <- "Spatial"
 assay <- DefaultAssay(seu)
+seu <- FindVariableFeatures(seu, nfeatures=opt$n_features)
 seu <- ScaleData(seu, assay=assay, verbose=FALSE)
 
 # Select spatially variable features using Moran's I
@@ -47,7 +48,8 @@ sv <- FindSpatiallyVariableFeatures(
   assay = assay,
   slot = "scale.data",
   selection.method = "moransi",
-  features = VariableFeatures(seu)[1:opt$n_features],
+  nfeatures = opt$n_features,
+  features = VariableFeatures(seu),
   x.cuts = 100, y.cuts = 100
 )
 
