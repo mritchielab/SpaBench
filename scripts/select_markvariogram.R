@@ -38,6 +38,7 @@ seu <- readRDS(opt$input)
 
 # Ensure we're operating on the 'Spatial' assay, then scale the data
 assay <- DefaultAssay(seu)
+seu <- FindVariableFeatures(seu, nfeatures=opt$n_features)
 seu <- ScaleData(seu, assay=assay, verbose=FALSE)
 
 # Identify spatially variable features using mark‑variogram
@@ -46,7 +47,8 @@ sv <- FindSpatiallyVariableFeatures(
   assay = assay,
   slot = "scale.data",
   selection.method = "markvariogram",
-  features = VariableFeatures(seu)[1:opt$n_features]
+  nfeatures = opt$n_features,
+  features = VariableFeatures(seu)
 )
 
 # Write out feature list and updated object
