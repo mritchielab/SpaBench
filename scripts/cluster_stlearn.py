@@ -3,9 +3,13 @@ import argparse
 import scanpy as sc
 import stlearn as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 import subprocess
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
+
 
 def main():
     p = argparse.ArgumentParser()
@@ -79,23 +83,78 @@ def main():
         show=False,
         return_fig=True
     )
-    # fig 有可能是单个 Figure 或 list，所以统一处理
-    if isinstance(fig, list):
-        for f in fig:
-            f.savefig(args.out_png, dpi=300, bbox_inches='tight')
-            plt.close(f)
-    else:
-        fig.savefig(args.out_png, dpi=300, bbox_inches='tight')
-        plt.close(fig)
+    
+        # Robust save helper: handle Figure, Axes, list/tuple/ndarray of them, or other duck-typed objects.
+    def _save_plot_object(obj, out_path):
+        """
+        Save a plot object to out_path.
+        Accepts matplotlib.figure.Figure, matplotlib.axes.Axes, list/tuple/ndarray of those,
+        or other objects supporting savefig/get_figure.
+        If multiple objects are given, create numbered files with _0 _1 suffixes.
+        """
+        p = Path(out_path)
+        # If list-like, iterate and save with suffixes
+        if isinstance(obj, (list, tuple, np.ndarray)):
+            # if only one element, save to original path
+            if len(obj) == 1:
+                _save_plot_object(obj[0], out_path)
+            else:
+                stem = p.stem
+                ext = p.suffix or ".png"
+                parent = p.parent
+                for i, sub in enumerate(obj):
+                    target = parent / f"{stem}_{i}{ext}"
+                    _save_plot_object(sub, str(target))
+            return
+
+        # If Figure, save directly
+        if isinstance(obj, Figure):
+            obj.savefig(str(p), dpi=300, bbox_inches='tight')
+            plt.close(obj)
+            return
+
+        # If Axes, get its figure then save
+        if isinstance(obj, Axes):
+            fig = obj.get_figure()
+            fig.savefig(str(p), dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            return
+
+        # duck-typing fallback: try savefig or get_figure
+        if hasattr(obj, "savefig") and callable(getattr(obj, "savefig")):
+            obj.savefig(str(p), dpi=300, bbox_inches='tight')
+            try:
+                plt.close(obj)
+            except Exception:
+                pass
+            return
+        if hasattr(obj, "get_figure") and callable(getattr(obj, "get_figure")):
+            fig = obj.get_figure()
+            fig.savefig(str(p), dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            return
+
+        raise RuntimeError(f"Cannot save plot object of type {type(obj)} to {out_path}")
+
+    # Save the returned figure/axes robustly. If multiple subplots/figs are returned,
+    # generate numbered files: out.png -> out_0.png, out_1.png, ...
+    _save_plot_object(fig, args.out_png)
+    
+    # fig can be single Figure or list，所以统一处理
+    #if isinstance(fig, list):
+    #    for f in fig:
+    #        f.savefig(args.out_png, dpi=300, bbox_inches='tight')
+    #        plt.close(f)
+    #else:
+    #    fig.savefig(args.out_png, dpi=300, bbox_inches='tight')
+    #    plt.close(fig)
         
     # 12. export Seurat RDS via H5AD + Rscript (using schard::h5ad2seurat)
-    # 构造临时 h5ad 路径（与 out_rds 只替换后缀）
     tmp_h5ad = args.out_rds.replace(".rds", ".h5ad")
-    # 先把当前 AnnData 再写一次为临时 h5ad
     adata.write_h5ad(tmp_h5ad)
     print(f"Temporary H5AD written to {tmp_h5ad}", flush=True)
 
-    # 调用 Rscript 转换并保存为 Seurat RDS
+    # Rscript transfer and save as Seurat RDS
     try:
         subprocess.check_call([
             "Rscript", "-e",
