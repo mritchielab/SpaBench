@@ -274,7 +274,8 @@ rule select_features_nnSVG:
         csv="results/{sample}/{norm}/nnSVG/04_nnSVG.csv",
         plot="results/{sample}/{norm}/nnSVG/05_nnSVG.png"
     params:
-        nfeat=lambda wc: config["features"]["n_features"]
+        nfeat=lambda wc: config["features"]["n_features"],
+        platform=lambda wc: config["platform"]
     wildcard_constraints:
         feat="nnSVG"
     log: "logs/{sample}/{norm}/nnSVG/select.log"
@@ -289,6 +290,7 @@ rule select_features_nnSVG:
           --n_features {params.nfeat} \
           --hvg_csv {output.csv} \
           --plot_png {output.plot} \
+          --platform {params.platform} \
           > {log} 2>&1
         """
 
