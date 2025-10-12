@@ -14,9 +14,11 @@ option_list <- list(
   make_option("--output", type="character"),
   make_option("--n_features", type="integer"),
   make_option("--hvg_csv", type="character"),
+  make_option("--platform", type="character"),
   make_option("--plot_png", type="character")
 )
 opt <- parse_args(OptionParser(option_list=option_list))
+platform <- opt$platform
 
 seu <- readRDS(opt$input)
 assay <- DefaultAssay(seu)
@@ -67,11 +69,52 @@ seurat_to_spe <- function(seu, sample_id, img_id) {
   spe
 }
 
-spe <- seurat_to_spe(
-  seu,           
-  sample_id = "data1",
-  img_id    = "slice1"
-)
+seurat_to_spe_stereoslideseq <- function(seu, sample_id, img_id) {
+  sce <- Seurat::as.SingleCellExperiment(seu)
+  
+  ## 1. Build a DataFrame for rowData, pulling in feature names
+  feature_names <- rownames(sce)
+  rd <- DataFrame(
+    gene_id   = feature_names,
+    gene_name = feature_names
+  )
+  rownames(rd) <- feature_names
+  
+  ## 2. Spatial coords & image as before
+  spatialCoords <- as.matrix(
+    seu@images[[img_id]]@coordinates[, c("imagecol", "imagerow")]
+  )
+  
+  ## 3. Create the SpatialExperiment, injecting your rowData
+  spe <- SpatialExperiment(
+    assays       = assays(sce),
+    rowData      = rd,            # <<< use your new DataFrame here
+    colData      = colData(sce),
+    metadata     = metadata(sce),
+    reducedDims  = reducedDims(sce),
+    altExps      = altExps(sce),
+    sample_id    = sample_id,
+    spatialCoords= spatialCoords
+  )
+  
+  spe$in_tissue <- 1
+  spe$sample_id <- sample_id
+  spe
+}
+
+if (platform %in% c("Visium", "VisiumHD")) {
+  spe <- seurat_to_spe(
+    seu,           
+    sample_id = "data1",
+    img_id    = "slice1"
+  )
+} else if (platform %in% c("Slideseq", "Stereoseq")) {
+  spe <- seurat_to_spe_stereoslideseq(
+    seu,           
+    sample_id = "data1",
+    img_id    = "slice1"
+  )
+}
 
 # use SpatialExperiment object for nnSVG workflow
 spe <- filter_genes(spe)
@@ -93,6 +136,3 @@ saveRDS(seu, opt$output)
 # plot variable features
 p <- VariableFeaturePlot(seu)
 ggsave(opt$plot_png, p)
-
-
-
