@@ -32,8 +32,8 @@ snakemake -j 16
 
 ## To run specific branch of workflow:
 ```
-# in this case we want SpaGCN clustering results from all previous Normalization(5) * Feature selection(8) combinations which is 40
-snakemake -j 16 -p /pathtodata/{CLR,LogNormalize,RC,SCTransform,SpaNorm}/{vst,mvp,disp,markvariogram,moransi,nnSVG,SPARK,SPARK-X}/SpaGCN/06_SpaGCN_clustered.rds
+# In this case we want SpaGCN clustering results from 2 Normalization * 5 Feature selection combinations which is 10
+snakemake -j 8 -p /pathtodata/{LogNormalize,SCTransform}/{vst,moransi,nnSVG,SPARK,SPARK-X}/SpaGCN/06_SpaGCN_clustered.rds
 ```
 
 ## To run particular steps:
@@ -41,7 +41,7 @@ snakemake -j 16 -p /pathtodata/{CLR,LogNormalize,RC,SCTransform,SpaNorm}/{vst,mv
 snakemake data/CLR/nnSVG/BayesSpace/06_BayesSpace_clustered.rds -j 16 -p --allowed-rules cluster_BayesSpace 
 ```
 
-## To run cell type / spatial domain annotation with QC metrics computation:
+## To run cell type/spatial domain annotation with QC metrics computation:
 ```
 snakemake   $(find results/data -type f -name "07_*_clusters.csv" \
      | sed -e 's#/07_\(.*\)_clusters.csv#/09_\1_metrics.csv#')   --cores 16 -p --allowed-rules compute_metrics
