@@ -32,7 +32,8 @@ snakemake -j 16
 
 ## To run specific branch of workflow:
 ```
-snakemake -j 16 -p   /pathtodata/{CLR,LogNormalize,RC,SCTransform}/{vst,mvp,disp,markvariogram,moransi,nnSVG,SPARK,SPARK-X}/SpaGCN/06_SpaGCN_clustered.rds
+# in this case we want SpaGCN clustering results from all previous Normalization(5) * Feature selection(8) combinations which is 40
+snakemake -j 16 -p /pathtodata/{CLR,LogNormalize,RC,SCTransform,SpaNorm}/{vst,mvp,disp,markvariogram,moransi,nnSVG,SPARK,SPARK-X}/SpaGCN/06_SpaGCN_clustered.rds
 ```
 
 ## To run particular steps:
