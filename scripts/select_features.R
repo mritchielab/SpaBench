@@ -19,10 +19,20 @@ assay <- DefaultAssay(seu)
 if (!is.null(seu@commands$NormalizeData.Spatial) && seu@commands$NormalizeData.Spatial@params$normalization.method == 'RC'){
   mat <- GetAssayData(seu, assay=assay, slot="data")
   mat <- log1p(mat)
-  seu[[assay]]@layers$data <- mat
+  if ("layers" %in% slotNames(seu[[assay]])) {
+    seu[[assay]]@layers$data <- mat
+  } else {
+    seu[[assay]]$data <- mat
+  }
 }
-seu <- ScaleData(seu, assay=assay, verbose=FALSE)
-seu <- FindVariableFeatures(seu, selection.method=opt$method, nfeatures=opt$n_features)
+seu <- ScaleData(seu, assay=assay, verbose=TRUE)
+if (seu@commands$NormalizeData.Spatial@params$normalization.method == 'CLR') {
+  seu[["Spatial"]] <- as(object = seu[["Spatial"]], Class = "Assay")
+  seu[["Spatial"]] <- as(object =seu[["Spatial"]], Class = "Assay5")
+  seu <- FindVariableFeatures(seu, selection.method=opt$method, nfeatures=opt$n_features)
+} else {
+  seu <- FindVariableFeatures(seu, selection.method=opt$method, nfeatures=opt$n_features)
+}
 write.csv(VariableFeatures(seu), opt$hvg_csv, row.names=FALSE)
 saveRDS(seu, opt$output)
 
