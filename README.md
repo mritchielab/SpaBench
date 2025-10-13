@@ -4,6 +4,7 @@ Building upon Snakemake, SpaBench is a comprehensive spatial transcriptomics ben
 
 ## Overview of Algorithm Implementation
 <img  src="logo/algorithm_overview.png">
+
 | Algorithm | Functional Step | Language | Citation |
 | --- | --- | --- | --- |
 | `Seurat` | Object construction & Normalization & Feature selection & Dimensionality reduction & Clustering | R | [Hao et al. (2023)](https://www.nature.com/articles/s41587-023-01767-y)
