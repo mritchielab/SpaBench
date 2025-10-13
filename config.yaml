@@ -1,9 +1,9 @@
 # config.yaml
 
-# Samples to process
+# Samples information
 samples:
   - Human_DLPFC_151507
-# platform for sample: Visium, VisiumHD, Slideseq, Stereoseq
+# supported platform: Visium, VisiumHD, Slideseq, Stereoseq
 platform: Visium
 
 # Available normalization methods
