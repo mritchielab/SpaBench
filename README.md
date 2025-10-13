@@ -103,3 +103,6 @@ To address this
 ```diff
 + snakemake --cleanup-metadata data/LogNormalize/moransi/03_moransi.rds
 ```
+
+### Master Snakemake
+Learn more techniques in [Snakemake documentation](https://snakemake.readthedocs.io/en/stable/).
