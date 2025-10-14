@@ -24,7 +24,7 @@ Building upon Snakemake, SpaBench is a comprehensive sequencing-based spatial tr
 ## Parameter optimization and Post-processing strategy
 All algorithms in `SpaBench` include configurable parameters to help you obtain the optimal downstream results. The same options are available in the config file: by default `SpaBench` applies sensible defaults or the values suggested in the method tutorials from original authors, and you can change any parameter by editing the config. Users can perform parameter tuning through the config file. Common post-processing strategies and their configurable parameters are summarized in the table below.
 
-## To run the whole workflow:
+## To run the whole workflow: [Not recommend for large datasets]
 ```
 module load snakemake
 snakemake -j 16
