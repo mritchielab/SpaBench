@@ -36,7 +36,7 @@ snakemake -j 16
 snakemake -j 8 -p /pathtodata/{LogNormalize,SCTransform}/{vst,moransi,nnSVG,SPARK,SPARK-X}/SpaGCN/06_SpaGCN_clustered.rds
 ```
 
-## To run particular steps:
+## To run particular step:
 ```
 snakemake data/CLR/nnSVG/BayesSpace/06_BayesSpace_clustered.rds -j 16 -p --allowed-rules cluster_BayesSpace 
 ```
@@ -51,7 +51,7 @@ snakemake   $(find results/data -type f -name "07_*_clusters.csv" \
 ```
 python scripts/check.py -s /path/to/data
 ```
-It then returns with the checking result if anything is missing from the 400 combinations. An example as below.
+It checks if anything is missing from the 400 combinations, below is an example.
 ```
 ============================================================
 Checked 400 expected '06_*_clustered.rds' files for 1 sample dir(s).
@@ -66,17 +66,20 @@ Missing files (first 200 shown):
 ```
 
 ## Resource Management
-Snakemake can automatically determine which parts of the workflow can be run in parallel. By specifying more than one available core:
+Snakemake can automatically determine which parts of the workflow can be run in parallel by specifying more than one available core:
 ```
 snakemake --cores 16 /pathtodata/{CLR,LogNormalize,RC,SCTransform}/{vst,mvp,disp,markvariogram,moransi,nnSVG,SPARK,SPARK-X}/{BANKSY, BayesSpace. leiden, louvain, louvain_refine, SLM, SpatialPCA, stlearn, SpaGCN}/06_*_clustered.rds
 ```
 ## Before running this workflow, check the following information:
 ### Input data format
-Before running the downstream analysis, it is highly recommended to create spatial object using: 
+Before running the downstream analysis, it is highly recommended to create input objects using: 
 ``` 
 snakemake -j 8 -p  data/sample/01_raw_seurat.rds
 ```
-And check data format which can save plenty of time in format debugging. 
+Followed by checking the data format using:
+```
+Rscript scripts/check_input.R data/sample/01_raw_seurat.rds
+```
 
 ### Common bugs
 1. Wrong arguments, the following bug means you probably put a wrong name that Snakefile cannot recognize.
