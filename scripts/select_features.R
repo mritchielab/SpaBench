@@ -26,7 +26,7 @@ if (!is.null(seu@commands$NormalizeData.Spatial) && seu@commands$NormalizeData.S
   }
 }
 seu <- ScaleData(seu, assay=assay, verbose=TRUE)
-if (seu@commands$NormalizeData.Spatial@params$normalization.method == 'CLR') {
+if (!is.null(seu@commands$NormalizeData.Spatial) && seu@commands$NormalizeData.Spatial@params$normalization.method == 'CLR') {
   seu[["Spatial"]] <- as(object = seu[["Spatial"]], Class = "Assay")
   seu[["Spatial"]] <- as(object = seu[["Spatial"]], Class = "Assay5")
   seu <- FindVariableFeatures(seu, selection.method=opt$method, nfeatures=opt$n_features)
