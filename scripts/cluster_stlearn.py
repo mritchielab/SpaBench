@@ -10,7 +10,6 @@ import subprocess
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 
-
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--raw-h5ad",       required=True,  dest="raw_h5ad")
@@ -23,6 +22,7 @@ def main():
     p.add_argument("--n-pcs",          type=int,    default=50,   dest="n_pcs")
     p.add_argument("--resolution",     type=float,  default=1.0,  dest="resolution")
     p.add_argument("--n-neighbors",    type=int,    default=10,   dest="n_neighbors")
+    p.add_argument("--platform",       required=True, dest="platform")
     args = p.parse_args()
 
     out_dir = Path(args.out_h5ad).parent
@@ -43,8 +43,14 @@ def main():
       print(f"Warning: {len(bad)} genes not found in AnnData and will be skipped:", bad, flush=True)
 
     adata = adata[:, valid_feats].copy()
-    # 3. Convert for stLearn (adds spatial to .obsm)
-    adata = st.convert_scanpy(adata)
+   # 3. Convert for stLearn (adds spatial to .obsm) — ONLY for Visium / VisiumHD
+    # If platform is Stereoseq or Slideseq we skip conversion and use adata as-is.
+    if str(args.platform).lower() in ("visium", "visiumhd"):
+        adata = st.convert_scanpy(adata)
+    else:
+        # minimal change: skip convert_scanpy for Stereoseq/Slideseq
+        print(f"Platform = {args.platform}; skipping st.convert_scanpy() and using input AnnData as-is.", flush=True)
+        adata.uns["spatial"] = adata.obsm["spatial"]
 
     # 4. Morphology (if requested)
     if args.use_morph:
@@ -76,13 +82,17 @@ def main():
     adata.obs[['stlearn']].to_csv(args.out_csv)
 
     # 11. Plot spatial clusters
-    fig = sc.pl.spatial(
+    if str(args.platform).lower() in ("visium", "visiumhd"):
+      fig = sc.pl.spatial(
         adata,
         color='stlearn',
         title='stLearn_louvain',
         show=False,
         return_fig=True
-    )
+    )    
+    else:
+      fig = sc.pl.embedding(adata, basis="spatial", color="stlearn",
+                      title="stLearn_louvain", show=False, return_fig=True)
     
         # Robust save helper: handle Figure, Axes, list/tuple/ndarray of them, or other duck-typed objects.
     def _save_plot_object(obj, out_path):
