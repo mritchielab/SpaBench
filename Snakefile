@@ -513,7 +513,8 @@ rule cluster_stlearn:
         morph_flag  = "--use-morphology" if config["stlearn"]["use_morphology"] else "",
         n_pcs       = lambda wc: config["stlearn"].get("n_pcs", 50),
         resolution  = lambda wc: config["stlearn"].get("resolution", 1.0),
-        n_neighbors = lambda wc: config["stlearn"]["n_neighbors"]
+        n_neighbors = lambda wc: config["stlearn"]["n_neighbors"],
+        platform    = lambda wc: config["platform"]
     threads: 36
     log: "logs/{sample}/{norm}/{feat}/stlearn/cluster.log"
     shell:
@@ -532,6 +533,7 @@ rule cluster_stlearn:
           --out-csv    {output.csv} \
           --out-rds    {output.rds} \
           --out-png    {output.png} \
+          --platform   {params.platform} \
           {params.morph_flag} \
           --n-pcs      {params.n_pcs} \
           --resolution {params.resolution} \
