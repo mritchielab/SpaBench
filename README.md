@@ -44,6 +44,8 @@ snakemake data/CLR/nnSVG/BayesSpace/06_BayesSpace_clustered.rds -j 16 -p --allow
 ## To run cell type/spatial domain annotation with QC metrics computation:
 ```
 snakemake   $(find results/data -type f -name "07_*_clusters.csv" \
+     | sed -e 's#/07_\(.*\)_clusters.csv#/09_\1_annotated.rds#')   --cores 16 -p --allowed-rules annotate_clusters
+snakemake   $(find results/data -type f -name "07_*_clusters.csv" \
      | sed -e 's#/07_\(.*\)_clusters.csv#/09_\1_metrics.csv#')   --cores 16 -p --allowed-rules compute_metrics
 ```
 
