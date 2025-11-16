@@ -111,6 +111,7 @@ To address this
 ```diff
 + snakemake --cleanup-metadata data/LogNormalize/moransi/03_moransi.rds
 ```
+4. Note SpaBench only allows parallel processing of samples from the same technical platform - do not run Visium and Stereoseq data at the same time.
 
 ### Master Snakemake
 Learn more techniques in [Snakemake documentation](https://snakemake.readthedocs.io/en/stable/).
