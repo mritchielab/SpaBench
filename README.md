@@ -5,7 +5,7 @@ Building upon Snakemake, SpaBench is a comprehensive sequencing-based spatial tr
 ## Overview of Algorithm Implementation
 <img  src="logo/algorithm_overview.png">
 
-| Algorithm | Functional Step | Language | Citation |
+| Algorithm | Functional Step | Language | Reference |
 | --- | --- | --- | --- |
 | `Seurat` | Object construction & Normalization & Feature selection & Dimensionality reduction & Clustering | R | [Hao et al. (2023)](https://www.nature.com/articles/s41587-023-01767-y)
 | `Squidpy` | Object construction & Image feature computation | Python | [Palla et al. (2022)](https://www.nature.com/articles/s41592-021-01358-2)
