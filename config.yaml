@@ -87,7 +87,7 @@ SpaGCN:
 
 # stLearn–specific parameters
 stlearn:
-  # 当使用 Louvain 时构建邻接图的 neighbors 数目
+  # number of neighbors when using Louvain to construct Adjacency Graph
   n_neighbors: 10
   n_pcs: 50
   resolution: 1.0
