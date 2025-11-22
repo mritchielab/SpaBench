@@ -26,13 +26,7 @@ if (!is.null(seu@commands$NormalizeData.Spatial) && seu@commands$NormalizeData.S
   }
 }
 seu <- ScaleData(seu, assay=assay, verbose=TRUE)
-if (!is.null(seu@commands$NormalizeData.Spatial) && seu@commands$NormalizeData.Spatial@params$normalization.method == 'CLR') {
-  seu[["Spatial"]] <- as(object = seu[["Spatial"]], Class = "Assay")
-  seu[["Spatial"]] <- as(object = seu[["Spatial"]], Class = "Assay5")
-  seu <- FindVariableFeatures(seu, selection.method=opt$method, nfeatures=opt$n_features)
-} else {
-  seu <- FindVariableFeatures(seu, selection.method=opt$method, nfeatures=opt$n_features)
-}
+seu <- FindVariableFeatures(seu, selection.method=opt$method, nfeatures=opt$n_features)
 write.csv(VariableFeatures(seu), opt$hvg_csv, row.names=FALSE)
 saveRDS(seu, opt$output)
 
