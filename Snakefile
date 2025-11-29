@@ -441,7 +441,9 @@ rule cluster_BayesSpace:
     input:
         rds="data/{sample}/{norm}/{feat}/04_reduced.rds"
     output:
-        rds="data/{sample}/{norm}/{feat}/BayesSpace/06_BayesSpace_clustered.rds"
+        rds="data/{sample}/{norm}/{feat}/BayesSpace/06_BayesSpace_clustered.rds",
+        csv ="results/{sample}/{norm}/{feat}/BayesSpace/07_BayesSpace_clusters.csv",
+        plot="results/{sample}/{norm}/{feat}/BayesSpace/08_BayesSpace_clusters.png"
     params:
         sce_rds="data/{sample}/{norm}/{feat}/BayesSpace/05_BayesSpace_sce.rds",
         meta_csv="results/{sample}/{norm}/{feat}/BayesSpace/07_BayesSpace_clusters.csv",
