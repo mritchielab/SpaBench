@@ -1,10 +1,17 @@
 # config.yaml
 
-# Samples information
+# Samples to process
 samples:
   - Human_DLPFC_151507
-# supported platform: Visium, VisiumHD, Slideseq, Stereoseq
+# platform for sample: Visium, VisiumHD, Slideseq, Stereoseq
 platform: Visium
+
+# optional per-sample overrides
+sample_platforms:
+  Human_DLPFC_151676: Visium
+  Human_BreAST_BlockASection1: VisiumHD
+# optional non-standard raw filename (default 'filtered_feature_bc_matrix.h5')
+raw_filename: filtered_feature_bc_matrix.h5
 
 # Available normalization methods
 normalizations:
@@ -31,7 +38,7 @@ sctransform:
 #  - nnSVG           # Seurat nnSVG
 # Parameters for vst
 #features:
-#  n_features: 2000
+#  n_features: 10000
 
 features:
   methods:
@@ -43,7 +50,7 @@ features:
     - nnSVG
     - SPARK
     - SPARK-X
-  n_features: 2000
+  n_features: 10000
 
 # Available dimensionality‐reduction methods
 # (we use PCA and UMAP in a combined script)
@@ -64,7 +71,7 @@ algorithms:
   BANKSY: null   # SPECIAL: BANKSY will be handled by cluster_BANKSY rule
   BayesSpace: null    # special: handled by cluster_BayesSpace
   SpaGCN: null      # handled by cluster_SpaGCN
-  SpatialPCA: null  
+  SpatialPCA: null     
   SpatialLeiden: null
   stlearn: null
 
@@ -74,7 +81,7 @@ clustering:
   nrep: 1000        # BayesSpace MCMC repetitions
   burn_in: 100      # BayesSpace MCMC burn-in
   q: 10             # BayesSpace number of clusters
-  lambda: 0.8       # Banksy-specific λ
+  lambda: 0.2       # 0:non-spatial clustering; 0.2:cell typing; 0.8:domain segmentation
   k_geom: 50        # Banksy-specific k_geom
 
 # SpaGCN-specific parameters
@@ -87,19 +94,30 @@ SpaGCN:
 
 # stLearn–specific parameters
 stlearn:
-  # number of neighbors when using Louvain to construct Adjacency Graph
+  # 当使用 Louvain 时构建邻接图的 neighbors 数目
   n_neighbors: 10
   n_pcs: 50
   resolution: 1.0
-  use_morphology: true
+  use_morphology: false
 
 # SpatialPCA–specific parameters
 SpatialPCA:
   n_clusters: 10      # desired number of clusters
   refine: false       # if true, set fast=FALSE; if false, fast=TRUE
 
-# Visualization / metrics summary
+# SpatialLeiden-specific parameters
+SpatialLeiden:
+  n_neighbors: 10           # k for latent graph (same intent as stlearn n_neighbors)
+  n_pcs: 30                 # number of PCs to compute / use
+  resolution: 2.5           # default latent resolution
+  layer_ratio: 1.8          # weighting between expression and spatial layers
+  coord_type: "generic"     # passed to squidpy.gr.spatial_neighbors: "generic" or "grid"
+  spatial_n_neighbors: 10   # neighbors for spatial graph (n_neighs in squidpy)
+  directed: false           # directed graph flag for
+  refine: true              # if true, run resolution search to match n_clusters
+  search_n_clusters: 15   # optional: if provided, tune resolution to produce this # clusters
+
+# Visualization metrics summary
 metrics_summary:
   plot_width: 16
   plot_height: 14
-
