@@ -573,6 +573,54 @@ rule cluster_SpatialPCA:
           > {log} 2>&1
         """
 
+# 4.7 SpatialLeiden‐specific clustering rule
+rule cluster_SpatialLeiden:
+    input:
+        raw_h5ad     = "data/{sample}/01_sc_raw_anndata.h5ad",
+        features_csv = "results/{sample}/{norm}/{feat}/04_{feat}.csv"
+    output:
+        h5ad = "data/{sample}/{norm}/{feat}/SpatialLeiden/09_SpatialLeiden_clustered.h5ad",
+        csv  = "results/{sample}/{norm}/{feat}/SpatialLeiden/07_SpatialLeiden_clusters.csv",
+        png  = "results/{sample}/{norm}/{feat}/SpatialLeiden/08_SpatialLeiden_clusters.png",
+        rds  = "data/{sample}/{norm}/{feat}/SpatialLeiden/06_SpatialLeiden_clustered.rds"
+    params:
+        n_neighbors = lambda wc: config["SpatialLeiden"]["n_neighbors"],
+        n_pcs      = lambda wc: config["SpatialLeiden"]["n_pcs"],
+        resolution  = lambda wc: config["SpatialLeiden"]["resolution"],
+        layer_ratio = lambda wc: config["SpatialLeiden"]["layer_ratio"],
+        coord_type  = lambda wc: config["SpatialLeiden"]["coord_type"],
+        spatial_n_neighbors = lambda wc: config["SpatialLeiden"]["spatial_n_neighbors"],
+        refine_flag = lambda wc: "--refine" if config["SpatialLeiden"]["refine"] else "",
+        search_n_clusters_flag = lambda wc: (
+            f"--search-n-clusters {config['SpatialLeiden']['search_n_clusters']}"
+        ) if config["SpatialLeiden"].get("search_n_clusters", None) is not None else ""
+    threads: 36
+    log: "logs/{sample}/{norm}/{feat}/SpatialLeiden/cluster.log"
+    shell:
+        r"""
+        mkdir -p data/{wildcards.sample}/{wildcards.norm}/{wildcards.feat}/SpatialLeiden \
+                 results/{wildcards.sample}/{wildcards.norm}/{wildcards.feat}/SpatialLeiden \
+                 logs/{wildcards.sample}/{wildcards.norm}/{wildcards.feat}/SpatialLeiden
+        
+        module load python
+        python scripts/cluster_SpatialLeiden.py \
+          --raw-h5ad {input.raw_h5ad} \
+          --features {input.features_csv} \
+          --out-h5ad {output.h5ad} \
+          --out-csv {output.csv} \
+          --out-png {output.png} \
+          --out-rds {output.rds} \
+          --n-neighbors {params.n_neighbors} \
+          --n-pcs {params.n_pcs} \
+          --resolution {params.resolution} \
+          --layer-ratio {params.layer_ratio} \
+          --coord-type {params.coord_type} \
+          --spatial-n-neighs {params.spatial_n_neighbors} \
+          {params.search_n_clusters_flag} \
+          {params.refine_flag} \
+          > {log} 2>&1
+        """
+
 # 5.1. Cell type annotation & metrics computation
 import glob, os
 rule compute_metrics:
