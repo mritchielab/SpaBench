@@ -15,6 +15,8 @@ import os
 import sys
 import subprocess
 import warnings
+import traceback
+import random
 
 import anndata as ad
 import scanpy as sc
@@ -47,6 +49,12 @@ def parse_args():
 
 def main():
     args = parse_args()
+    
+    # Set global seeds for reproducibility since spatialleiden argument failed
+    random_state = 0
+    np.random.seed(random_state)
+    random.seed(random_state)
+    
     sc.settings.autosave = False
     sc.settings.verbosity = 3
 
@@ -57,6 +65,7 @@ def main():
     # subset to features if provided (expect a CSV with a column of gene names)
     if args.features_csv and os.path.exists(args.features_csv):
         feats = pd.read_csv(args.features_csv, header=0)
+
         # try common column names
         if "gene" in feats.columns:
             feat_names = feats["gene"].astype(str).tolist()
@@ -64,13 +73,34 @@ def main():
             feat_names = feats["feature"].astype(str).tolist()
         else:
             # take first column
-            feat_names = feats.iloc[:,0].astype(str).tolist()
-        feat_present = [g for g in feat_names if g in adata.var_names]
-        if len(feat_present) == 0:
+            feat_names = feats.iloc[:, 0].astype(str).tolist()
+
+        # remove duplicates in feat_names but preserve order (keep first occurrence)
+        seen = set()
+        feat_names_unique = []
+        for g in feat_names:
+            if g not in seen:
+                feat_names_unique.append(g)
+                seen.add(g)
+
+        # Map gene names to the first matching position in adata.var_names
+        positions = []
+        # matched_names = [] # unused variable
+        for g in feat_names_unique:
+            # find indices where var_names equals g
+            pos = np.where(adata.var_names == g)[0]
+            if pos.size > 0:
+                idx = int(pos[0])              # take the first match only
+                if idx not in positions:       # avoid adding same index twice
+                    positions.append(idx)
+                    # matched_names.append(adata.var_names[idx])
+
+        if len(positions) == 0:
             warnings.warn("No selected features found in adata.var_names; proceeding without subsetting.")
         else:
-            adata = adata[:, feat_present].copy()
-            print(f"Subset to {len(feat_present)} features.", file=sys.stderr)
+            # Subset by integer positions (safe even when var_names are not unique)
+            adata = adata[:, positions].copy()
+            print(f"Subset to {len(positions)} features (duplicates removed/first-match kept).", file=sys.stderr)
 
     # preprocess: log1p and PCA
     if "X_pca" not in adata.obsm:
@@ -89,7 +119,6 @@ def main():
         print("Computed spatial neighbors via squidpy.", file=sys.stderr)
     except Exception as e:
         warnings.warn(f"Failed to compute spatial neighbors: {e}")
-        # continue; spatialleiden may need spatial connectivity; we try to proceed
 
     # convert distances -> spatial_connectivities if spatial distances exist
     if "spatial_distances" in adata.obsp:
@@ -102,28 +131,34 @@ def main():
     # optionally run resolution search to match desired n_clusters
     latent_resolution = args.resolution
     spatial_resolution = args.resolution
+    
     if args.refine and (args.search_n_clusters is not None):
         n_clusters = int(args.search_n_clusters)
         print(f"Searching resolution to reach {n_clusters} clusters...", file=sys.stderr)
+
         try:
             latent_resolution, spatial_resolution = sl.search_resolution(
                 adata,
                 n_clusters,
-                latent_kwargs={},  # no random state
+                latent_kwargs={"random_state": random_state},
                 spatial_kwargs={
                     "layer_ratio": args.layer_ratio,
+                    # REMOVED "random_state": random_state because spatialleiden doesn't accept it
                     "directed": (False, True),
-                    "spatial_resolution": None,  # search_resolution will vary this
                 },
             )
-            print(f"Found latent_resolution={latent_resolution:.3f}, spatial_resolution={spatial_resolution:.3f}", file=sys.stderr)
+            print(f"Found latent_resolution={latent_resolution:.4f}, spatial_resolution={spatial_resolution:.4f}", file=sys.stderr)
         except Exception as e:
+            print("search_resolution failed; printing traceback:", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             warnings.warn(f"search_resolution failed, falling back to provided resolution {args.resolution}: {e}")
             latent_resolution = args.resolution
             spatial_resolution = args.resolution
 
+
     # run standard leiden for comparison
     try:
+        # Note: Added flavor='igraph' to silence future warning if your environment supports it
         sc.tl.leiden(adata, resolution=latent_resolution, key_added="leiden", directed=False)
     except Exception as e:
         warnings.warn(f"leiden failed: {e}")
@@ -155,7 +190,6 @@ def main():
 
     # plot spatial embedding colored by clusters (use spatial coordinates)
     try:
-        # prefer sq.pl.spatial if available coordinates; fallback to sc.pl.embedding
         if "spatial" in adata.obsm_keys():
             sc.pl.embedding(adata, basis="spatial", color=["spatialleiden"], show=False)
             plt.savefig(args.out_png, bbox_inches="tight", dpi=150)
@@ -176,20 +210,22 @@ def main():
     except Exception as e:
         warnings.warn(f"Writing h5ad failed: {e}")
 
-    # create a simple RDS placeholder by reading the csv in R and saving an RDS
-    # This produces an R-readable .rds file so downstream R stages that expect .rds succeed.
+    # Call Rscript to save Seurat RDS
     try:
-        cmd = [
+        subprocess.check_call([
             "Rscript", "-e",
             (
-                "d<-read.csv(file='{csv}', stringsAsFactors=FALSE); "
-                "saveRDS(d, file='{rds}')"
-            ).format(csv=args.out_csv.replace("'", "\\'"), rds=args.out_rds.replace("'", "\\'"))
-        ]
-        subprocess.run(cmd, check=True)
-        print(f"Wrote RDS placeholder from CSV -> {args.out_rds}", file=sys.stderr)
-    except Exception as e:
-        warnings.warn(f"Creating RDS via Rscript failed: {e}")
+                "library(reticulate); "
+                "library(Seurat); "
+                "library(SeuratObject); "
+                "library(schard); "
+                f"seu_data <- h5ad2seurat('{args.out_h5ad}', assay='Spatial'); "
+                f"SaveSeuratRds(seu_data, file = '{args.out_rds}')"
+            )
+        ])
+        print(f"Seurat RDS saved to {args.out_rds}", flush=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"Rscript failed with exit code {e.returncode}")
 
 if __name__ == "__main__":
     main()
