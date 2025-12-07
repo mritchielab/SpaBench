@@ -112,7 +112,6 @@ SpatialLeiden:
   resolution: 2.5           # default latent resolution
   layer_ratio: 1.8          # weighting between expression and spatial layers
   coord_type: "generic"     # passed to squidpy.gr.spatial_neighbors: "generic" or "grid"
-  spatial_n_neighbors: 10   # neighbors for spatial graph (n_neighs in squidpy)
   directed: false           # directed graph flag for
   refine: true              # if true, run resolution search to match n_clusters
   search_n_clusters: 15   # optional: if provided, tune resolution to produce this # clusters
