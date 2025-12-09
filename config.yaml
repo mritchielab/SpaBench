@@ -75,7 +75,7 @@ algorithms:
   SpatialLeiden: null
   stlearn: null
 
-# Clustering parameters
+# Clustering parameters (Seurat & BANKSY)
 clustering:
   resolution: 0.5   # generic resolution for Seurat clustering
   nrep: 1000        # BayesSpace MCMC repetitions
