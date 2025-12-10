@@ -472,13 +472,19 @@ rule cluster_SpaGCN:
     input:
         raw_h5ad     = "data/{sample}/01_raw_anndata.h5ad",
         positions    = "data/{sample}/01_positions.csv",
-        features_csv = "results/{sample}/{norm}/{feat}/04_{feat}.csv"
+        features_csv = "results/{sample}/{norm}/{feat}/04_{feat}.csv",
+        # Ensure image is an input if you use histology!
+        img          = "data/{sample}/histology.tif" # Change extension/path as needed
     output:
-        rds         = "data/{sample}/{norm}/{feat}/SpaGCN/06_SpaGCN_clustered.rds",
-        csv         = "results/{sample}/{norm}/{feat}/SpaGCN/07_SpaGCN_clusters.csv",
-        png         = "results/{sample}/{norm}/{feat}/SpaGCN/08_SpaGCN_clusters.png"
+        rds          = "data/{sample}/{norm}/{feat}/SpaGCN/06_SpaGCN_clustered.rds",
+        csv          = "results/{sample}/{norm}/{feat}/SpaGCN/07_SpaGCN_clusters.csv",
+        png          = "results/{sample}/{norm}/{feat}/SpaGCN/08_SpaGCN_clusters.png"
     params:
-        refine_flag=lambda wc: "--refine" if config["SpaGCN"]["refine"] else ""
+        refine_flag  = lambda wc: "--refine" if config["SpaGCN"]["refine"] else "",
+        hist_flag    = lambda wc: "--histology" if config["SpaGCN"].get("histology", False) else "",
+        beta         = config["SpaGCN"]["beta"],
+        alpha        = config["SpaGCN"]["alpha"],
+        n_clusters   = config["SpaGCN"]["n_clusters"]
     threads: 36
     log: "logs/{sample}/{norm}/{feat}/SpaGCN/cluster.log"
     shell:
@@ -490,14 +496,18 @@ rule cluster_SpaGCN:
         eval "$(micromamba shell hook --shell bash)"
         module load micromamba
 
-        micromamba run -n SpaGCN-env python scripts/cluster_SpaGCN.py \
+        micromamba run -p /vast/projects/SpatialTranscriptomicsBenchmarking/Snakemake_workflow/env/SpaGCN python scripts/cluster_SpaGCN.py \
           --raw_h5ad   {input.raw_h5ad} \
           --positions  {input.positions} \
           --features   {input.features_csv} \
           --out_rds    {output.rds} \
           --out_csv    {output.csv} \
           --out_png    {output.png} \
-          {params.refine_flag} \
+          --img        {input.img} \
+          --n_clusters {params.n_clusters} \
+          --beta       {params.beta} \
+          --alpha      {params.alpha} \
+          {params.refine_flag} {params.hist_flag} \
           > {log} 2>&1
         """
 
