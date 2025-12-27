@@ -633,30 +633,47 @@ rule cluster_SpatialLeiden:
 
 # 5.1. Cell type annotation & metrics computation
 import glob, os
-rule compute_metrics:
+# --- annotation step ---
+rule annotate_clusters:
     input:
         seurat   = "data/{sample}/{norm}/{feat}/{alg}/06_{alg}_clustered.rds",
         clusters = "results/{sample}/{norm}/{feat}/{alg}/07_{alg}_clusters.csv",
         truth    = "data/Ground_truth/{sample}/labels.tsv"
     output:
-        metrics  = "results/{sample}/{norm}/{feat}/{alg}/09_{alg}_metrics.csv",
         seurat_annot = "results/{sample}/{norm}/{feat}/{alg}/09_{alg}_annotated.rds",
         seurat_plot  = "results/{sample}/{norm}/{feat}/{alg}/09_{alg}_annotation.png"
-    #threads: 1
-    #resources:
-      #mem_mb=16000 
+    log: "logs/{sample}/{norm}/{feat}/{alg}/annotate.log"
+    shell:
+        """
+        mkdir -p results/{wildcards.sample}/{wildcards.norm}/{wildcards.feat}/{wildcards.alg}
+        {RSCRIPT} scripts/annotate_clusters.R \
+          --seurat      {input.seurat} \
+          --clusters    {input.clusters} \
+          --truth       {input.truth} \
+          --seurat_out  {output.seurat_annot} \
+          --plot_seurat {output.seurat_plot} \
+          > {log} 2>&1
+        """
+
+# --- metrics computation step ---
+rule compute_metrics:
+    input:
+        seurat_annot = "results/{sample}/{norm}/{feat}/{alg}/09_{alg}_annotated.rds",
+        truth        = "data/Ground_truth/{sample}/labels.tsv"
+    output:
+        metrics = "results/{sample}/{norm}/{feat}/{alg}/09_{alg}_metrics.csv",
+        plot    = "results/{sample}/{norm}/{feat}/{alg}/09_{alg}_metrics_plot.png"
     log:
         "logs/{sample}/{norm}/{feat}/{alg}/metrics.log"
     shell:
         """
         mkdir -p results/{wildcards.sample}/{wildcards.norm}/{wildcards.feat}/{wildcards.alg}
         {RSCRIPT} scripts/compute_metrics.R \
-          --seurat   {input.seurat} \
-          --clusters {input.clusters} \
-          --truth    {input.truth} \
-          --out      {output.metrics} \
-          --seurat_out   {output.seurat_annot} \
-          --plot_seurat  {output.seurat_plot} \
+          --seurat_annot {input.seurat_annot} \
+          --truth         {input.truth} \
+          --out           {output.metrics} \
+          --plot          {output.plot} \
+          --algorithm     {wildcards.alg} \
           > {log} 2>&1
         """
 
