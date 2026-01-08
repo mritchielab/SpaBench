@@ -124,6 +124,10 @@ if (platform %in% c("Visium", "VisiumHD")) {
 keep = filterGenes(spe, 0.2)
 table(keep)
 spe = spe[keep, ]
+# Filter out spots that have zero total counts across the remaining genes
+keep_spots <- colSums(counts(spe)) > 0
+message("Removing ", sum(!keep_spots), " spots with zero counts.")
+spe <- spe[, keep_spots]
 logcounts(spe) = log2(counts(spe) + 1)
 spe <- SpaNorm(spe)
 fit.spanorm <- metadata(spe)$SpaNorm
