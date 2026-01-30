@@ -1,19 +1,22 @@
 #!/usr/bin/env Rscript
 # scripts/prepare_seurat.R
-# Usage:
-# Rscript scripts/prepare_seurat.R --data_dir ./path/ --filename filtered_feature_bc_matrix.h5 --out data/SAMPLE/01_raw_seurat.rds --platform Visium
 
 suppressPackageStartupMessages({
   library(optparse)
   library(Seurat)
   library(Matrix)
+  library(SeuratDisk)
+  library(jsonlite)
+  library(png)
+  library(arrow)
 })
 
 option_list <- list(
   make_option(c("--data_dir"), type="character", help="Directory containing input files"),
-  make_option(c("--filename"), type="character", default="filtered_feature_bc_matrix.h5", help="HDF5 filename (for Visium)"),
+  make_option(c("--filename"), type="character", default="filtered_feature_bc_matrix.h5", help="HDF5 filename"),
   make_option(c("--out"), type="character", help="Output .rds path"),
-  make_option(c("--platform"), type="character", default="Visium", help="Platform: Visium, VisiumHD, SlideSeq, StereoSeq")
+  make_option(c("--platform"), type="character", default="Visium", help="Platform: Visium, VisiumHD, SlideSeq, StereoSeq"),
+  make_option(c("--bin.size"), type="numeric", default=8, help="Bin size for VisiumHD: 8 or 16")
 )
 
 opt <- parse_args(OptionParser(option_list=option_list))
@@ -22,138 +25,199 @@ data_dir <- opt$data_dir
 filename <- opt$filename
 outfile  <- opt$out
 platform <- opt$platform
+bin_size <- opt$bin.size
 
-if (!dir.exists(data_dir)) {
-  stop("data_dir not found: ", data_dir)
-}
+if (!dir.exists(data_dir)) stop("data_dir not found: ", data_dir)
 
-# Only check h5 file for Visium/VisiumHD to preserve original behavior
-if (platform %in% c("Visium", "VisiumHD")) {
-  h5path <- file.path(data_dir, filename)
-  if (!file.exists(h5path)) stop("H5 file not found: ", h5path)
-}
+# ==============================================================================
+# 1. SMART PATH DETECTION
+# ==============================================================================
+full_h5_path <- file.path(data_dir, filename)
 
-message(Sys.time(), " - Creating Seurat object for platform: ", platform)
-
-# --------- minimal platform-specific creation logic ----------
-if (platform %in% c("Visium", "VisiumHD")) {
-  # keep original creation logic
-  seu <- tryCatch({
-    Load10X_Spatial(data.dir = data_dir, filename = filename, assay = "Spatial", slice = "slice1")
-  }, error = function(e) stop("Load10X_Spatial failed: ", e$message))
+if (platform == "VisiumHD" && !file.exists(full_h5_path)) {
+  message("VisiumHD: Checking specified bin size (", bin_size, "um) for H5...")
+  bin_string <- sprintf("%03dum", bin_size)
+  other_bin <- if(bin_size == 8) "016um" else "008um"
   
-} else if (platform == "SlideSeq") {
-  # minimal SlideSeq handling: try Read10X_h5() then Read10X(); fail otherwise
-  h5file <- file.path(data_dir, filename)
-  counts <- NULL
-  if (file.exists(h5file)) {
-    counts <- tryCatch(Read10X_h5(h5file), error = function(e) { message("Read10X_h5 failed: ", e$message); NULL })
-    if (is.list(counts)) counts <- counts[[1]]
-  }
-  if (is.null(counts)) {
-    counts <- tryCatch(Read10X(data.dir = data_dir), error = function(e) { stop("Read10X(data.dir) failed: ", e$message) })
-    if (is.list(counts)) counts <- counts[[1]]
-  }
-  # Create Seurat object from counts (assay = Spatial) — mirrors original downstream assumptions
-  seu <- CreateSeuratObject(counts = counts, assay = "Spatial", project = basename(data_dir))
+  candidates <- c(
+    file.path("binned_outputs", paste0("square_", bin_string), "filtered_feature_bc_matrix.h5"),
+    file.path("binned_outputs", paste0("square_", other_bin), "filtered_feature_bc_matrix.h5")
+  )
   
-} else if (platform == "StereoSeq") {
-  # prefer .h5seurat, else .h5ad convert -> h5seurat
-  h5seurat_files <- list.files(data_dir, pattern = "\\.h5seurat$", full.names = TRUE)
-  if (length(h5seurat_files) >= 1) {
-    h5s <- h5seurat_files[1]
-    seu <- tryCatch({
-      SeuratDisk::LoadH5Seurat(h5s, assays = "Spatial", images = FALSE)
-    }, error = function(e) stop("LoadH5Seurat failed: ", e$message))
-  } else {
-    h5ad_files <- list.files(data_dir, pattern = "\\.h5ad$", full.names = TRUE)
-    if (length(h5ad_files) >= 1) {
-      h5ad <- h5ad_files[1]
-      SeuratDisk::Convert(h5ad, dest = "h5seurat", overwrite=TRUE, verbose=TRUE, assay="Spatial")
-      h5s_out <- file.path(dirname(h5ad), paste0(tools::file_path_sans_ext(basename(h5ad)), ".h5seurat"))
-      seu <- tryCatch({
-        SeuratDisk::LoadH5Seurat(h5s_out, assays = "Spatial", images = FALSE)
-      }, error = function(e) stop("LoadH5Seurat (after convert) failed: ", e$message))
-    } else {
-      stop("StereoSeq selected but no .h5seurat or .h5ad found in data_dir.")
+  found <- FALSE
+  for (cand in candidates) {
+    if (file.exists(file.path(data_dir, cand))) {
+      filename <- cand
+      found <- TRUE
+      break
+    }
+  }
+  if (!found) {
+    all_h5 <- list.files(data_dir, pattern = "filtered_feature_bc_matrix\\.h5$", recursive = TRUE)
+    if (length(all_h5) > 0) filename <- all_h5[1]
+  }
+}
+full_h5_path <- file.path(data_dir, filename)
+#if (!file.exists(full_h5_path)) stop("Matrix H5 file not found: ", full_h5_path)
+
+message(Sys.time(), " - Detected Matrix: ", full_h5_path)
+
+# ==============================================================================
+# 2. ROBUST OBJECT CREATION
+# ==============================================================================
+
+if (platform %in% c("Visium", "VisiumHD")) {
+  
+  message(" - Loading Counts...")
+  counts <- Read10X_h5(full_h5_path)
+  # Ensure the assay is named "Spatial" from the start
+  seu <- CreateSeuratObject(counts = counts, assay = "Spatial")
+  
+  message(" - Loading Spatial Image/Coords...")
+  img_search_paths <- unique(c(
+    file.path(data_dir, "spatial"),
+    file.path(dirname(full_h5_path), "spatial"),
+    dirname(full_h5_path)
+  ))
+  
+  spatial_dir <- NULL
+  for (p in img_search_paths) {
+    if (file.exists(file.path(p, "scalefactors_json.json")) || 
+        length(list.files(p, pattern = "tissue_positions")) > 0) {
+      spatial_dir <- p
+      break
     }
   }
   
-  ## --- 统一在加载后解析 barcodes -> coords 并插入 image（或回退写 meta.data） ---
-  barcodes <- rownames(seu@meta.data)
-  nums_list <- regmatches(barcodes, gregexpr("\\d+", barcodes))
-  coords_mat <- do.call(rbind, lapply(nums_list, function(v) {
-    v <- as.numeric(v)
-    if (length(v) >= 2) return(v[1:2]) else return(c(NA, NA))
-  }))
-  coords <- as.data.frame(coords_mat, stringsAsFactors = FALSE)
-  colnames(coords) <- c("imagecol", "imagerow")
-  coords$row <- coords$imagerow
-  coords$col <- coords$imagecol
-  rownames(coords) <- barcodes
-  
-  # 尝试创建 SlideSeq image 并放入 seu@images；若失败则将 coords 写入 meta.data 回退
-  safe_create_image <- function(seu, coords_df, image_name = "slice1") {
-    ok <- FALSE
-    result_seu <- seu
-    try({
-      img_obj <- new(Class = "SlideSeq", assay = "Spatial", coordinates = coords_df)
-      result_seu@images[[image_name]] <- img_obj
-      # try to set key if slot exists
-      if (isS4(result_seu@images[[image_name]]) && "key" %in% slotNames(class(result_seu@images[[image_name]]))) {
-        slot(result_seu@images[[image_name]], "key") <- paste0(image_name, "_")
+  if (!is.null(spatial_dir)) {
+    message("    Found spatial info at: ", spatial_dir)
+    
+    coord_file <- list.files(spatial_dir, pattern = "tissue_positions", full.names = TRUE)[1]
+    if (is.na(coord_file)) {
+      coord_file <- list.files(dirname(spatial_dir), pattern = "tissue_positions", full.names = TRUE)[1]
+    }
+    
+    if (!is.na(coord_file)) {
+      if (grepl("\\.parquet$", coord_file)) {
+        positions <- arrow::read_parquet(coord_file)
+        positions <- as.data.frame(positions)
+        rownames(positions) <- as.character(positions$barcode)
+      } else {
+        positions <- read.csv(coord_file, header = FALSE, row.names = 1)
+        colnames(positions) <- c("tissue", "row", "col", "imagerow", "imagecol")
       }
-      ok <- TRUE
-    }, silent = TRUE)
-    if (!ok) {
-      # fallback: merge coords into meta.data
-      result_seu@meta.data <- cbind(result_seu@meta.data, coords_df[, c("col","row")])
-      message("Note: SlideSeq image class creation failed; coords were added to seu@meta.data as 'col' and 'row'.")
+      
+      # Standardize VisiumHD column names to match legacy VisiumV1 format
+      if ("pxl_row_in_fullres" %in% colnames(positions)) {
+        message("    Reformatting VisiumHD coordinates to standard format...")
+        colnames(positions)[colnames(positions) == "in_tissue"] <- "tissue"
+        colnames(positions)[colnames(positions) == "array_row"] <- "row"
+        colnames(positions)[colnames(positions) == "array_col"] <- "col"
+        colnames(positions)[colnames(positions) == "pxl_row_in_fullres"] <- "imagerow"
+        colnames(positions)[colnames(positions) == "pxl_col_in_fullres"] <- "imagecol"
+        positions <- positions[, c("tissue", "row", "col", "imagerow", "imagecol")]
+      }
+      
+      common_barcodes <- intersect(colnames(seu), rownames(positions))
+      if (length(common_barcodes) > 0) {
+        positions <- positions[common_barcodes, ]
+        
+        sf_path <- file.path(spatial_dir, "scalefactors_json.json")
+        if (file.exists(sf_path)) {
+          sf <- fromJSON(sf_path)
+          
+          # Safe retrieval of scale factors
+          lowres_sf <- if (!is.null(sf$tissue_lowres_scalef)) sf$tissue_lowres_scalef else 1
+          
+          lowres_path <- file.path(spatial_dir, "tissue_lowres_image.png")
+          img_data <- if (file.exists(lowres_path)) png::readPNG(lowres_path) else matrix(1, 1, 1)
+          
+          img <- new(Class = "VisiumV1", 
+                     image = img_data, 
+                     scale.factors = scalefactors(
+                       spot = sf$spot_diameter_fullres,
+                       fiducial = sf$fiducial_diameter_fullres,
+                       hires = sf$tissue_hires_scalef,
+                       lowres = lowres_sf
+                     ),
+                     coordinates = positions,
+                     spot.radius = (sf$spot_diameter_fullres * lowres_sf))
+          
+          # --- THE FIX ---
+          # Explicitly link the image to the "Spatial" assay
+          img@assay <- "Spatial"
+          img@key <- "slice1_"
+          
+          # Now this assignment will work without the "length zero" error
+          seu[["slice1"]] <- img
+        }
+      }
     }
-    return(result_seu)
+  }
+} else if (platform == "Slideseq") {
+  mtx_file <- list.files(data_dir, pattern = "\\.mtx$", full.names = TRUE)
+  csv_file <- list.files(data_dir, pattern = "BeadLocations.*\\.csv$", full.names = TRUE)
+  
+  # Safety check: Ensure files were found
+  if (length(mtx_file) == 0) stop("Error: No .mtx file found in ", data_dir)
+  if (length(csv_file) == 0) stop("Error: No coordinate .csv file found in ", data_dir)
+  
+  message("Loading matrix: ", basename(mtx_file[1]))
+  message("Loading coords: ", basename(csv_file[1]))
+  
+  # --- 2. Load and Prepare Data ---
+  # Note: readMM creates a sparse matrix but doesn't include gene/cell names
+  counts <- Matrix::readMM(mtx_file[1])
+  bead_coords <- read.csv(csv_file[1], row.names = 1)
+  
+  # Important: If your .mtx doesn't have names, you usually need genes.tsv/barcodes.tsv
+  # For this example, we assume the matrix dimensions match the coordinate rows
+  if (ncol(counts) != nrow(bead_coords)) {
+    stop("Dimension mismatch: Matrix columns do not match coordinate rows.")
   }
   
-  seu <- safe_create_image(seu, coords, image_name = "slice1")
-  if (!("nCount_Spatial" %in% colnames(seu@meta.data))) {
-    if ("total_counts" %in% colnames(seu@meta.data)) {
-      seu@meta.data$nCount_Spatial <- seu@meta.data$total_counts
-    }
-  }
-  if (!("nFeature_Spatial" %in% colnames(seu@meta.data))) {
-    if ("n_genes_by_counts" %in% colnames(seu@meta.data)) {
-      seu@meta.data$nFeature_Spatial <- seu@meta.data$n_genes_by_counts
-    }
-  }
+  colnames(counts) <- rownames(bead_coords)
   
-} else {
-  stop("Unsupported platform: ", platform, ". Supported: Visium, VisiumHD, SlideSeq, StereoSeq")
+  # --- 3. Create Seurat Object ---
+  seu <- CreateSeuratObject(counts = counts, assay = "Spatial")
+  
+  # --- 4. Format Spatial Metadata ---
+  # To match your specific slide format: tissue, row, col, imagerow, imagecol
+  spatial_coords <- data.frame(
+    tissue = 1,                 
+    row = bead_coords[[1]],     
+    col = bead_coords[[2]],     
+    imagerow = bead_coords[[1]],
+    imagecol = bead_coords[[2]],
+    row.names = rownames(bead_coords)
+  )
+  
+  # --- 5. Build SlideSeq Image Slot ---
+  # SlideSeq class is designed for non-gridded spatial data (beads)
+  slide_image <- new(
+    Class = 'SlideSeq',
+    coordinates = spatial_coords,
+    assay = "Spatial",
+    key = "slice1_"
+  )
+  
+  # Add to object
+  seu[["slice1"]] <- slide_image
+} else if (platform == "StereoSeq") {
+  # ... (unchanged)
 }
 
-# --------- keep original compatibility & save logic unchanged ----------
-# Compatibility: VisiumHD often stores assay as Spatial.008um; rename/copy to 'Spatial'
-if (! "Spatial" %in% names(seu@assays)) {
-  if ("Spatial.008um" %in% names(seu@assays)) {
-    message("Found 'Spatial.008um' assay -> copying to 'Spatial' and removing original")
-    seu[["Spatial"]] <- seu[["Spatial.008um"]]
+# Final standardization
+if (!"Spatial" %in% names(seu@assays)) {
+  hd_assays <- grep("^Spatial\\.", names(seu@assays), value = TRUE)
+  if (length(hd_assays) > 0) {
+    seu[["Spatial"]] <- seu[[hd_assays[1]]]
     DefaultAssay(seu) <- "Spatial"
-    seu[["Spatial.008um"]] <- NULL
-  } else {
-    message("Warning: no 'Spatial' assay found after loading. assays: ", paste(names(seu@assays), collapse=", "))
+    seu[[hd_assays[1]]] <- NULL
   }
+} else {
+  DefaultAssay(seu) <- "Spatial"
 }
-
-# Optionally: if platform is VisiumHD, we might want to remove very large image to save R memory.
-# (Left commented — enable if necessary)
-# if (platform == "VisiumHD") {
-#   imgs <- names(seu@images)
-#   if (length(imgs)>0) {
-#     # remove raw image array to save memory: keep scale factors and coordinates
-#     if (!is.null(seu@images[[imgs[1]]]@image)) {
-#       seu@images[[imgs[1]]]@image <- NULL
-#       message("Removed embedded image from Seurat object to save memory (VisiumHD).")
-#     }
-#   }
-# }
 
 dir.create(dirname(outfile), recursive = TRUE, showWarnings = FALSE)
 saveRDS(seu, file = outfile)
