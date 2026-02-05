@@ -12,7 +12,8 @@ Building upon Snakemake, SpaBench is a comprehensive sequencing-based spatial tr
 | `SpatialExperiment` | Object construction | R | [Righelli et al. (2022)](https://academic.oup.com/bioinformatics/article/38/11/3128/6575443)
 | `SpaNorm` | Normalization | R | [Salim et al. (2025)](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-025-03565-y)
 | `nnSVG` | Feature selection | R | [Weber et al. (2023)](https://www.nature.com/articles/s41467-023-39748-z)
-| `SPARK` & `SPARK-X` | Feature selection | R | [Zhu et al. (2021)](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-021-02404-0)
+| `SPARK` | Feature selection | R | [Sun et al. (2020)](https://www.nature.com/articles/s41592-019-0701-7)
+| `SPARK-X` | Feature selection | R | [Zhu et al. (2021)](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-021-02404-0)
 | `SpatialPCA` |  Dimensionality reduction & Clustering | R | [Shang et al. (2022)](https://www.nature.com/articles/s41467-022-34879-1)
 | `SpatialLeiden` | Clustering | Python | [Müller-Bötticher et al. (2025)](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-025-03489-7)
 | `stlearn` | Clustering | Python | [Pham et al. (2023)](https://www.nature.com/articles/s41467-023-43120-6 )
@@ -21,7 +22,7 @@ Building upon Snakemake, SpaBench is a comprehensive sequencing-based spatial tr
 | `SpaGCN` | Clustering | Python | [Hu et al. (2021)](https://www.nature.com/articles/s41592-021-01255-8)
 | `SingleR` | Annotation | R | [Aran et al. (2019)](https://www.nature.com/articles/s41590-018-0276-y)
 
-## Parameter optimization and Post-processing strategy
+## Hyperparameter optimization
 All algorithms in `SpaBench` include configurable parameters to help you obtain the optimal downstream results. The same options are available in the config file: by default `SpaBench` applies sensible defaults or the values suggested in the method tutorials from original authors, and you can change any parameter by editing the config. Users can perform parameter tuning through the config file. Common post-processing strategies and their configurable parameters are summarized in the table below.
 
 ## To run the whole workflow: [Not recommend for large datasets]
