@@ -1,19 +1,14 @@
 # config.yaml
 
-# Samples to process
+# Samples information
 samples:
   - Human_DLPFC_151507
 # platform for sample: Visium, VisiumHD, Slideseq, Stereoseq
 platform: Visium
-
-# optional per-sample overrides
-sample_platforms:
-  Human_DLPFC_151676: Visium
-  Human_BreAST_BlockASection1: VisiumHD
 # optional non-standard raw filename (default 'filtered_feature_bc_matrix.h5')
 raw_filename: filtered_feature_bc_matrix.h5
 
-# Available normalization methods
+# Normalization methods
 normalizations:
   - LogNormalize
   - SCTransform
@@ -30,16 +25,7 @@ normalize:
 sctransform:
   assay: Spatial
 
-# Available feature‐selection methods
-#feature_methods:
-#  - vst             # Seurat FindVariableFeatures(selection.method="vst")
-#  - markvariogram   # Seurat FindSpatiallyVariableFeatures(method="markvariogram")
-#  - moransi         # Seurat FindSpatiallyVariableFeatures(method="moransi")
-#  - nnSVG           # Seurat nnSVG
-# Parameters for vst
-#features:
-#  n_features: 10000
-
+# Feature selection methods
 features:
   methods:
     - vst
@@ -53,7 +39,6 @@ features:
   n_features: 10000
 
 # Available dimensionality‐reduction methods
-# (we use PCA and UMAP in a combined script)
 reduction_methods:
   - PCA
   - UMAP
@@ -94,7 +79,6 @@ SpaGCN:
 
 # stLearn–specific parameters
 stlearn:
-  # 当使用 Louvain 时构建邻接图的 neighbors 数目
   n_neighbors: 10
   n_pcs: 50
   resolution: 1.0
