@@ -23,7 +23,7 @@ Building upon Snakemake, SpaBench is a comprehensive sequencing-based spatial tr
 | `SingleR` | Annotation | R | [Aran et al. (2019)](https://www.nature.com/articles/s41590-018-0276-y)
 
 ## Hyperparameter optimization
-All algorithms in `SpaBench` include configurable parameters to help you obtain the optimal downstream results. The same options are available in the config file: by default `SpaBench` applies sensible defaults or the values suggested in the method tutorials from original authors, and you can change any parameter by editing the config. Users can perform parameter tuning through the config file. Common post-processing strategies and their configurable parameters are summarized in the table below.
+All algorithms in `SpaBench` include configurable parameters to help you obtain the optimal downstream results. To speed up the process of hyperparameter optimization, Optuna is implemented as a refinement module.
 
 ## To run the whole workflow: [Not recommend for large datasets]
 ```
