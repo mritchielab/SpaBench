@@ -168,10 +168,12 @@ if (platform %in% c("Visium", "VisiumHD")) {
   # --- 2. Load and Prepare Data ---
   # Note: readMM creates a sparse matrix but doesn't include gene/cell names
   counts <- Matrix::readMM(mtx_file[1])
-  bead_coords <- read.csv(csv_file[1], row.names = 1)
+  bead_coords <- read.csv(csv_file[1], header = TRUE, check.names = FALSE)
+  rownames(bead_coords) <- bead_coords[,1]
+  bead_coords <- bead_coords[,-1]
   
   # Important: If your .mtx doesn't have names, you usually need genes.tsv/barcodes.tsv
-  # For this example, we assume the matrix dimensions match the coordinate rows
+  # We assume the matrix dimensions match the coordinate rows
   if (ncol(counts) != nrow(bead_coords)) {
     stop("Dimension mismatch: Matrix columns do not match coordinate rows.")
   }
