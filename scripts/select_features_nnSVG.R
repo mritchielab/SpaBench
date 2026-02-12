@@ -118,7 +118,7 @@ if (platform %in% c("Visium", "VisiumHD")) {
 
 # use SpatialExperiment object for nnSVG workflow
 filtered_spe <- filter_genes(spe)
-if (length(spe@rowRanges) >= 2000 ) {
+if (length(filtered_spe@rowRanges) >= 2000 ) {
   spe <- filtered_spe
 }
 spe <- computeLibraryFactors(spe)
