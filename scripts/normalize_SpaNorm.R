@@ -125,6 +125,10 @@ keep = filterGenes(spe, 0.2)
 table(keep)
 if (sum(keep) >= 2000) {
   spe = spe[keep, ]
+} else {
+  # Fallback: if too few genes pass, take top 2000 by total counts
+  gene_counts <- rowSums(counts(spe))
+  spe <- spe[order(gene_counts, decreasing = TRUE)[1:2000], ]
 }
 # Filter out spots that have zero total counts across the remaining genes
 keep_spots <- colSums(counts(spe)) > 0
