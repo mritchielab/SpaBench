@@ -206,7 +206,24 @@ if (platform %in% c("Visium", "VisiumHD")) {
   # Add to object
   seu[["slice1"]] <- slide_image
 } else if (platform == "StereoSeq") {
-  # ... (unchanged)
+ h5ad_files <- list.files(data_dir, pattern = "\\.h5ad$", full.names = TRUE)
+  
+  if (length(h5ad_files) == 0) {
+    stop("No .h5ad file found in ", data_dir)
+  }
+  
+  message("Using schard to convert StereoSeq H5AD to Seurat...")
+  # schard is much more robust for modern H5AD files
+  seu <- schard::h5ad2seurat(h5ad_files[1], assay = "Spatial")
+  
+  # StereoSeq usually stores coordinates in a DimReduc called 'spatial' 
+  # or in the @images slot if converted
+  if ("spatial" %in% names(seu@reductions)) {
+    message("  Found spatial coordinates in reductions. Converting to metadata...")
+    coords <- as.data.frame(Embeddings(seu, "spatial"))
+    colnames(coords) <- c("x", "y")
+    seu@meta.data$x <- coords$x
+    seu@meta.data$y <- coords$y
 }
 
 # Final standardization
