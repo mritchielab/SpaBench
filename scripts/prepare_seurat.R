@@ -206,24 +206,117 @@ if (platform %in% c("Visium", "VisiumHD")) {
   # Add to object
   seu[["slice1"]] <- slide_image
 } else if (platform == "StereoSeq") {
- h5ad_files <- list.files(data_dir, pattern = "\\.h5ad$", full.names = TRUE)
+  library(hdf5r)
+  h5ad_files <- list.files(data_dir, pattern = "\\.h5ad$", full.names = TRUE)
+  if (length(h5ad_files) == 0) stop("No .h5ad found for StereoSeq.")
   
-  if (length(h5ad_files) == 0) {
-    stop("No .h5ad file found in ", data_dir)
+  # Prioritize 'processed' if it exists, otherwise take first
+  h5_path <- grep("_processed.h5ad$", h5ad_files, value = TRUE)[1]
+  if (is.na(h5_path)) h5_path <- h5ad_files[1]
+  
+  message("Manually extracting data from H5AD: ", h5_path)
+  file.h5 <- H5File$new(h5_path, mode = "r")
+  
+  # 1. DYNAMIC DATA PATH DETECTION
+  counts_path <- NULL
+  for (path in c("layers/raw_count", "X", "raw/X")) {
+    if (file.h5$exists(path)) { counts_path <- path; break }
+  }
+  if (is.null(counts_path)) stop("Could not find counts in layers/raw_count, X, or raw/X.")
+  
+  # 2. DIMENSIONS & NAMES
+  # Standard H5AD index paths
+  obs_names <- if(file.h5$exists("obs/_index")) file.h5[["obs/_index"]][] else stop("Missing obs index")
+  var_names <- if(file.h5$exists("var/_index")) file.h5[["var/_index"]][] else stop("Missing var index")
+  
+  n_obs <- length(obs_names)
+  n_var <- length(var_names)
+  message(sprintf(" - Found %d cells and %d genes", n_obs, n_var))
+  
+  # 3. SPARSE MATRIX RECONSTRUCTION
+  if (is(file.h5[[counts_path]], "H5Group")) {
+    message(" - Reconstruction from Sparse Group: ", counts_path)
+    data <- file.h5[[paste0(counts_path, "/data")]][]
+    indices <- file.h5[[paste0(counts_path, "/indices")]][]
+    indptr <- file.h5[[paste0(counts_path, "/indptr")]][]
+    
+    # DETERMINE IF CSR OR CSC
+    # If indptr length is n_obs + 1, it's CSR (Pointer = Cells, Indices = Genes)
+    if (length(indptr) == (n_obs + 1)) {
+      message("   - Matrix format: CSR (Cells as pointers)")
+      # We want (Genes x Cells). By using p = indptr (Cells), 
+      # indices + 1 must be rows (Genes).
+      counts <- sparseMatrix(
+        i = indices + 1,
+        p = indptr,
+        x = as.numeric(data),
+        dims = c(n_var, n_obs),
+        dimnames = list(var_names, obs_names),
+        giveCsparse = TRUE
+      )
+    } else {
+      message("   - Matrix format: CSC (Genes as pointers)")
+      # pointer is Genes, so indices + 1 are Cells. This creates (Cells x Genes)
+      counts_tmp <- sparseMatrix(
+        i = indices + 1,
+        p = indptr,
+        x = as.numeric(data),
+        dims = c(n_obs, n_var),
+        dimnames = list(obs_names, var_names),
+        giveCsparse = TRUE
+      )
+      counts <- Matrix::t(counts_tmp)
+    }
+  } else {
+    message(" - Loading Dense Matrix...")
+    counts <- t(file.h5[[counts_path]][,])
+    rownames(counts) <- var_names
+    colnames(counts) <- obs_names
   }
   
-  message("Using schard to convert StereoSeq H5AD to Seurat...")
-  # schard is much more robust for modern H5AD files
-  seu <- schard::h5ad2seurat(h5ad_files[1], assay = "Spatial")
+  # 4. COORDINATES
+  message(" - Extracting spatial coordinates...")
+  if (file.h5$exists("obs/x") && file.h5$exists("obs/y")) {
+    x_coords <- file.h5[["obs/x"]][]
+    y_coords <- file.h5[["obs/y"]][]
+  } else if (file.h5$exists("obsm/spatial")) {
+    # Scanpy obsm is stored as (n_obs, 2)
+    spatial_mat <- file.h5[["obsm/spatial"]][,]
+    # In HDF5r, matrices can be transposed depending on how they were written
+    if (ncol(spatial_mat) == n_obs) {
+      x_coords <- spatial_mat[1,]
+      y_coords <- spatial_mat[2,]
+    } else {
+      x_coords <- spatial_mat[,1]
+      y_coords <- spatial_mat[,2]
+    }
+  } else {
+    stop("Coordinates not found in obs/x,y or obsm/spatial.")
+  }
   
-  # StereoSeq usually stores coordinates in a DimReduc called 'spatial' 
-  # or in the @images slot if converted
-  if ("spatial" %in% names(seu@reductions)) {
-    message("  Found spatial coordinates in reductions. Converting to metadata...")
-    coords <- as.data.frame(Embeddings(seu, "spatial"))
-    colnames(coords) <- c("x", "y")
-    seu@meta.data$x <- coords$x
-    seu@meta.data$y <- coords$y
+  # 5. ASSEMBLE
+  seu <- CreateSeuratObject(counts = counts, assay = "Spatial")
+  
+  # Ensure any metadata from 'obs' is carried over
+  obs_data <- as.data.frame(lapply(names(file.h5[["obs"]]), function(n) {
+    if(is(file.h5[[paste0("obs/", n)]], "H5Dataset")) return(file.h5[[paste0("obs/", n)]][])
+  }))
+  # Filter out list elements that are NULL or complex
+  obs_data <- obs_data[!sapply(obs_data, is.null)]
+  
+  spatial_coords <- data.frame(
+    imagecol = x_coords,
+    imagerow = y_coords,
+    row = y_coords,
+    col = x_coords,
+    row.names = colnames(seu)
+  )
+  
+  seu[["slice1"]] <- new(Class = "SlideSeq", assay = "Spatial", 
+                         coordinates = spatial_coords, key = "slice1_")
+  
+  file.h5$close_all()
+  message("Successfully assembled StereoSeq object.")
 }
 
 # Final standardization
