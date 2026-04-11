@@ -643,6 +643,8 @@ rule annotate_clusters:
         seurat_annot = "results/{sample}/{norm}/{feat}/{alg}/09_{alg}_annotated.rds",
         seurat_plot  = "results/{sample}/{norm}/{feat}/{alg}/09_{alg}_annotation.png"
     log: "logs/{sample}/{norm}/{feat}/{alg}/annotate.log"
+    params:
+        save_rds = config.get("save_annotation_rds", True)
     shell:
         """
         mkdir -p results/{wildcards.sample}/{wildcards.norm}/{wildcards.feat}/{wildcards.alg}
@@ -652,6 +654,7 @@ rule annotate_clusters:
           --truth       {input.truth} \
           --seurat_out  {output.seurat_annot} \
           --plot_seurat {output.seurat_plot} \
+          --save_rds    {params.save_rds} \
           > {log} 2>&1
         """
 
