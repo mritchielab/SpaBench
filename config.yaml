@@ -100,6 +100,9 @@ SpatialLeiden:
   refine: true              # if true, run resolution search to match n_clusters
   search_n_clusters: 15   # optional: if provided, tune resolution to produce this # clusters
 
+# Whether to save the final annotated Seurat RDS file
+save_annotation_rds: true
+
 # Visualization metrics summary
 metrics_summary:
   plot_width: 16
