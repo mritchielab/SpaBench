@@ -1,9 +1,6 @@
 # config.yaml
 
-# Samples information
-samples:
-  - Human_DLPFC_151507
-# platform for sample: Visium, VisiumHD, Slideseq, Stereoseq
+# sample platform: Visium, VisiumHD, Slideseq, Stereoseq
 platform: Visium
 # optional non-standard raw filename (default 'filtered_feature_bc_matrix.h5')
 raw_filename: filtered_feature_bc_matrix.h5
