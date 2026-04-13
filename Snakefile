@@ -3,7 +3,6 @@
 configfile: "config.yaml"
 
 RSCRIPT = "/stornext/System/data/software/rhel/9/base/tools/R/4.5.1/lib64/R/bin/Rscript"
-SAMPLES = config["samples"]
 ALG     = config["algorithms"]
 
 ruleorder: cluster > cluster_BANKSY
