@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 340" width="680" height="340">
+<title>SpaBench hex sticker with threaded paths through method columns</title>
+<desc>Cream hexagonal sticker with deep navy border. Four columns of dots represent method choices per pipeline step; three curved paths thread through highlighted selections to suggest example workflows through the combinatorial space. SpaBench wordmark in italic serif.</desc>
+
+<defs>
+<clipPath id="hexClip"><polygon points="340,30 461.24,100 461.24,240 340,310 218.76,240 218.76,100"/></clipPath>
+</defs>
+
+<polygon points="340,30 461.24,100 461.24,240 340,310 218.76,240 218.76,100" fill="#F7F3EA"/>
+<polygon points="340,30 461.24,100 461.24,240 340,310 218.76,240 218.76,100" fill="none" stroke="#1E4A6E" stroke-width="5"/>
+
+<g clip-path="url(#hexClip)">
+<line x1="265" y1="80" x2="265" y2="180" stroke="#C4D2DE" stroke-width="0.6"/>
+<line x1="315" y1="80" x2="315" y2="180" stroke="#C4D2DE" stroke-width="0.6"/>
+<line x1="365" y1="80" x2="365" y2="180" stroke="#C4D2DE" stroke-width="0.6"/>
+<line x1="415" y1="80" x2="415" y2="180" stroke="#C4D2DE" stroke-width="0.6"/>
+
+<circle cx="265" cy="90" r="4" fill="#C4D2DE"/>
+<circle cx="265" cy="108" r="4" fill="#C4D2DE"/>
+<circle cx="265" cy="126" r="4" fill="#C4D2DE"/>
+<circle cx="265" cy="144" r="4" fill="#C4D2DE"/>
+<circle cx="265" cy="162" r="4" fill="#C4D2DE"/>
+
+<circle cx="315" cy="90" r="4" fill="#C4D2DE"/>
+<circle cx="315" cy="108" r="4" fill="#C4D2DE"/>
+<circle cx="315" cy="126" r="4" fill="#C4D2DE"/>
+<circle cx="315" cy="144" r="4" fill="#C4D2DE"/>
+<circle cx="315" cy="162" r="4" fill="#C4D2DE"/>
+
+<circle cx="365" cy="90" r="4" fill="#C4D2DE"/>
+<circle cx="365" cy="108" r="4" fill="#C4D2DE"/>
+<circle cx="365" cy="126" r="4" fill="#C4D2DE"/>
+<circle cx="365" cy="144" r="4" fill="#C4D2DE"/>
+<circle cx="365" cy="162" r="4" fill="#C4D2DE"/>
+
+<circle cx="415" cy="90" r="4" fill="#C4D2DE"/>
+<circle cx="415" cy="108" r="4" fill="#C4D2DE"/>
+<circle cx="415" cy="126" r="4" fill="#C4D2DE"/>
+<circle cx="415" cy="144" r="4" fill="#C4D2DE"/>
+<circle cx="415" cy="162" r="4" fill="#C4D2DE"/>
+
+<path d="M 265 108 C 290 108, 290 144, 315 144 C 340 144, 340 126, 365 126 C 390 126, 390 144, 415 144" fill="none" stroke="#87B0D0" stroke-width="1.8" stroke-linecap="round" opacity="0.75"/>
+
+<path d="M 265 144 C 290 144, 290 90, 315 90 C 340 90, 340 162, 365 162 C 390 162, 390 126, 415 126" fill="none" stroke="#4A82AE" stroke-width="2.2" stroke-linecap="round" opacity="0.85"/>
+
+<path d="M 265 126 C 290 126, 290 108, 315 108 C 340 108, 340 144, 365 144 C 390 144, 390 90, 415 90" fill="none" stroke="#1E4A6E" stroke-width="2.8" stroke-linecap="round"/>
+
+<circle cx="265" cy="126" r="5.5" fill="#1E4A6E"/>
+<circle cx="315" cy="108" r="5.5" fill="#1E4A6E"/>
+<circle cx="365" cy="144" r="5.5" fill="#1E4A6E"/>
+<circle cx="415" cy="90" r="5.5" fill="#1E4A6E"/>
+
+<circle cx="265" cy="144" r="4.5" fill="#4A82AE"/>
+<circle cx="315" cy="90" r="4.5" fill="#4A82AE"/>
+<circle cx="365" cy="162" r="4.5" fill="#4A82AE"/>
+<circle cx="415" cy="126" r="4.5" fill="#4A82AE"/>
+
+<circle cx="265" cy="108" r="4" fill="#87B0D0"/>
+<circle cx="315" cy="144" r="4" fill="#87B0D0"/>
+<circle cx="365" cy="126" r="4" fill="#87B0D0"/>
+<circle cx="415" cy="144" r="4" fill="#87B0D0"/>
+</g>
+
+<text x="340" y="235" text-anchor="middle" font-family="Georgia, 'DejaVu Serif', serif" font-size="36" font-style="italic" font-weight="500" fill="#1E4A6E" letter-spacing="0.5">SpaBench</text>
+</svg>
