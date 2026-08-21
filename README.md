@@ -7,6 +7,7 @@ SpaBench Explorer is an interactive companion app for our benchmarking study of 
 
 ## Overview of Algorithm Implementation
 <img  src="logo/algorithm_overview.png">
+<img  src="logo/spabench_sticker.svg">
 
 | Algorithm | Functional Step | Language | Reference |
 | --- | --- | --- | --- |
