@@ -1,6 +1,9 @@
 # SpaBench
 <img  src="logo/Snakemake.png">
-Building upon Snakemake, SpaBench is a comprehensive sequencing-based spatial transcriptomics benchmarking workflow which implements 24 distinct methods (non-spatial and spatially-aware ones) into 400 different workflow combinations. SpaBench begins from raw spatially-resolved gene count matrix, followed by normalization, feature selection, dimensionality reduction, and clustering. As the end point, SpaBench utilizes SingleR for cell type/spatial domain annotation and computes QC metrics, including both non-spatial ones such as NMI, HOM, COM, CHAOS, PAS, ASW, and spatially-aware IISC (Integrated Image–Spatial Cohesion).
+Building upon Snakemake, SpaBench is a comprehensive sequencing-based spatial transcriptomics benchmarking workflow which implements 24 distinct methods (non-spatial and spatially-aware ones) into 400 different workflow combinations. SpaBench begins from raw spatially-resolved gene count matrix, followed by normalization, feature selection, dimensionality reduction, and clustering. As the end point, SpaBench utilizes SingleR for cell type/spatial domain annotation and computes QC metrics, including both non-spatial ones such as NMI, HOM, COM, CHAOS, PAS, and ASW.
+
+# SpaBench Explorer
+SpaBench Explorer is an interactive companion app for our benchmarking study of a variety of sequencing-based spatial transcriptomics workflows. It allows you rank and filter workflows by metrics, inspect per-spot workflow results against the ground truth labels, decompose which pipeline step drives performance variance, and explore default-vs-tuned parameter effects. Built with R Shiny; live at (https://yangxuboom.shinyapps.io/SpaBench-explorer/).
 
 ## Overview of Algorithm Implementation
 <img  src="logo/algorithm_overview.png">
