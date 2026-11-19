@@ -29,22 +29,41 @@ import matplotlib.pyplot as plt
 import squidpy as sq
 import spatialleiden as sl
 
+# norm_data.py lives next to this script; append its directory explicitly because
+# `python -P` (used for SpatialLeiden) does not put the script directory on sys.path
+import os as _os, sys as _sys
+_sys.path.append(_os.path.dirname(_os.path.abspath(__file__)))
+from norm_data import read_feature_list, apply_normalized  # noqa: E402
+
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--raw-h5ad", dest="raw_h5ad", required=True)
-    p.add_argument("--features", dest="features_csv", required=False)
+    p.add_argument("--features", dest="features_csv", required=False,
+                   help="Selected genes (04_<feat>.csv); if omitted, all genes of the normalised object")
+    p.add_argument("--norm-h5", dest="norm_h5", required=True,
+                   help="Normalised expression of this workflow (02_<norm>_normalized.h5, "
+                        "written by scripts/export_normalized.R)")
     p.add_argument("--out-h5ad", dest="out_h5ad", required=True)
     p.add_argument("--out-csv", dest="out_csv", required=True)
     p.add_argument("--out-png", dest="out_png", required=True)
     p.add_argument("--out-rds", dest="out_rds", required=True)
     p.add_argument("--n-neighbors", dest="n_neighbors", type=int, default=10)
-    p.add_argument("--n-pcs", dest="n_pcs", type=int, default=30)
+    p.add_argument("--n-pcs", dest="n_pcs", type=int, default=50)  # scanpy default
     p.add_argument("--resolution", dest="resolution", type=float, default=1.0)
     p.add_argument("--layer-ratio", dest="layer_ratio", type=float, default=1.8)
     p.add_argument("--coord-type", dest="coord_type", type=str, default="generic")
     p.add_argument("--spatial-n-neighs", dest="spatial_n_neighs", type=int, default=10)
     p.add_argument("--refine", dest="refine", action="store_true")
     p.add_argument("--search-n-clusters", dest="search_n_clusters", type=int, default=None)
+    p.add_argument("--use-weights", dest="use_weights", nargs=2,
+                   type=lambda x: x.lower() == "true",
+                   default=[True, True], metavar=("LATENT", "SPATIAL"),
+                   help="Use edge weights for [latent, spatial] layers (default: True True)")
+    p.add_argument("--search-start", dest="search_start", nargs=2, type=float,
+                   default=[1.0, 0.4], metavar=("LATENT", "SPATIAL"),
+                   help="Starting resolution for [latent, spatial] search (default: 1.0 0.4)")
+    p.add_argument("--n-leiden-iter", dest="n_leiden_iter", type=int, default=-1,
+                   help="Leiden iterations (-1 = run until convergence)")
     return p.parse_args()
 
 def main():
@@ -62,51 +81,25 @@ def main():
     adata = ad.read_h5ad(args.raw_h5ad)
     print(f"Loaded AnnData: {adata.shape}", file=sys.stderr)
 
-    # subset to features if provided (expect a CSV with a column of gene names)
-    if args.features_csv and os.path.exists(args.features_csv):
-        feats = pd.read_csv(args.features_csv, header=0)
+    # Replace X by THIS workflow's normalised values (Step 1) for ITS selected
+    # genes (Step 2); spots are restricted to those in the normalised object and
+    # obsm['spatial'] is carried over for the same (reduced) spot set.
+    if args.features_csv:
+        if not os.path.exists(args.features_csv):
+            raise FileNotFoundError(args.features_csv)
+        feat_names = read_feature_list(args.features_csv)
+    else:
+        from norm_data import read_normalized
+        feat_names = list(read_normalized(args.norm_h5)[1])
+    adata = apply_normalized(adata, args.norm_h5, feat_names)
+    if "spatial" not in adata.obsm:
+        raise ValueError("obsm['spatial'] missing from the input AnnData")
+    print(f"Clustering {adata.n_obs} spots x {adata.n_vars} genes (normalised input; no log1p).",
+          file=sys.stderr)
 
-        # try common column names
-        if "gene" in feats.columns:
-            feat_names = feats["gene"].astype(str).tolist()
-        elif "feature" in feats.columns:
-            feat_names = feats["feature"].astype(str).tolist()
-        else:
-            # take first column
-            feat_names = feats.iloc[:, 0].astype(str).tolist()
-
-        # remove duplicates in feat_names but preserve order (keep first occurrence)
-        seen = set()
-        feat_names_unique = []
-        for g in feat_names:
-            if g not in seen:
-                feat_names_unique.append(g)
-                seen.add(g)
-
-        # Map gene names to the first matching position in adata.var_names
-        positions = []
-        # matched_names = [] # unused variable
-        for g in feat_names_unique:
-            # find indices where var_names equals g
-            pos = np.where(adata.var_names == g)[0]
-            if pos.size > 0:
-                idx = int(pos[0])              # take the first match only
-                if idx not in positions:       # avoid adding same index twice
-                    positions.append(idx)
-                    # matched_names.append(adata.var_names[idx])
-
-        if len(positions) == 0:
-            warnings.warn("No selected features found in adata.var_names; proceeding without subsetting.")
-        else:
-            # Subset by integer positions (safe even when var_names are not unique)
-            adata = adata[:, positions].copy()
-            print(f"Subset to {len(positions)} features (duplicates removed/first-match kept).", file=sys.stderr)
-
-    # preprocess: log1p and PCA
-    if "X_pca" not in adata.obsm:
-        sc.pp.log1p(adata)
-        sc.pp.pca(adata, n_comps=args.n_pcs)
-        print("Computed PCA.", file=sys.stderr)
+    # PCA on the normalised values (no further log1p / library-size normalisation)
+    sc.pp.pca(adata, n_comps=min(args.n_pcs, adata.n_vars - 1, adata.n_obs - 1))
+    print("Computed PCA.", file=sys.stderr)
 
     # compute latent neighbors (based on PCA)
     sc.pp.neighbors(adata, n_neighbors=args.n_neighbors, use_rep="X_pca")
@@ -140,11 +133,12 @@ def main():
             latent_resolution, spatial_resolution = sl.search_resolution(
                 adata,
                 n_clusters,
+                start=tuple(args.search_start),
                 latent_kwargs={"random_state": random_state},
                 spatial_kwargs={
                     "layer_ratio": args.layer_ratio,
-                    # REMOVED "random_state": random_state because spatialleiden doesn't accept it
                     "directed": (False, True),
+                    "use_weights": tuple(args.use_weights),
                 },
             )
             print(f"Found latent_resolution={latent_resolution:.4f}, spatial_resolution={spatial_resolution:.4f}", file=sys.stderr)
@@ -170,6 +164,8 @@ def main():
             layer_ratio=args.layer_ratio,
             resolution=(latent_resolution, spatial_resolution),
             directed=(False, True),
+            use_weights=tuple(args.use_weights),
+            n_iterations=args.n_leiden_iter,
             key_added="spatialleiden"
         )
         print("spatialleiden finished.", file=sys.stderr)

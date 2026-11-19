@@ -1,11 +1,49 @@
 # config.yaml
 
-# sample platform: Visium, VisiumHD, Slideseq, Stereoseq
+# Samples processed by the default target (`snakemake -j N`); one folder per sample under data/
+samples: []
+#  - Human_DLPFC_151673
+
+# Default platform (Visium, VisiumHD, Slideseq, Stereoseq) for samples not listed below
 platform: Visium
+
+# Per-sample platform. Every rule (prepare, SpaNorm, nnSVG, reduce, BayesSpace,
+# SpaGCN, stLearn) reads the platform from here, so mixed-platform runs need no config edits.
+sample_platforms:
+  HCC: Visium
+  Human_Breast_Cancer_BlockASection1: Visium
+  Human_DLPFC_151673: Visium
+  Mouse_brain_squidpy: Visium
+  Mouse_embryo_Visium: Visium
+  Human_colon_cancer_VisiumHD: VisiumHD
+  Mouse_brain_VisiumHD: VisiumHD
+  Mouse_embryo_E12_VisiumHD: VisiumHD
+  Mouse_embryo_stereoseq_E9: Stereoseq
+  Mouse_embryo_stereoseq: Stereoseq        # E10.5
+  Mouse_embryo_stereoseq_E12: Stereoseq
+  Mouse_embryo_stereoseq_E13: Stereoseq
+  Mouse_embryo_stereoseq_E16: Stereoseq
+  Mouse_hippocampus_Stereoseq: Stereoseq
+  Mouse_liver_stereoseq: Stereoseq
+  Mouse_hippocampus_Slideseq: Slideseq
+  Mouse_olfactory_bulb: Slideseq
+
+# Executables and environments (defaults assume Rscript / python / micromamba are on PATH)
+rscript: Rscript
+python: python                    # python with scanpy/anndata (used by prepare_anndata)
+env_spagcn: env/SpaGCN            # micromamba prefix used by cluster_SpaGCN
+env_stlearn: env/stlearn          # micromamba prefix used by cluster_stlearn
+python_spatialleiden: python      # python with spatialleiden, squidpy installed
 # optional non-standard raw filename (default 'filtered_feature_bc_matrix.h5')
 raw_filename: filtered_feature_bc_matrix.h5
 
-# Normalization methods
+# Step 0 QC, applied in prepare_seurat / prepare_anndata before any object enters the pipeline
+qc:
+  remove_mt: true          # remove mitochondrial genes
+  mt_pattern: "^mt-"       
+  in_tissue_only: true     # Visium / Visium HD: keep only spots/bins with in_tissue = 1
+
+# Available normalization methods
 normalizations:
   - LogNormalize
   - SCTransform
@@ -22,7 +60,7 @@ normalize:
 sctransform:
   assay: Spatial
 
-# Feature selection methods
+# Available feature‐selection methods
 features:
   methods:
     - vst
@@ -33,16 +71,17 @@ features:
     - nnSVG
     - SPARK
     - SPARK-X
-  n_features: 10000
-
-# Available dimensionality‐reduction methods
-reduction_methods:
-  - PCA
-  - UMAP
+  n_features: 2000
+  spatial_n_candidates: 0     # moransi / markvariogram: score the N most frequently detected genes (0 = all detected genes)
+  markvariogram_workers: 8    # parallel workers for markvariogram (~2 GB memory each)
 
 # PCA parameters
-pca:
-  npcs: 30
+# Number of principal components used by every method that reduces dimensions.
+#   PC: default -> each method uses its own package default:
+#        louvain / louvain_refine / SLM / leiden 10 (Seurat FindNeighbors; Step 3 computes 50),
+#        BANKSY 20, BayesSpace 15, SpatialPCA 20 (spatial PCs), SpaGCN 50, stLearn 50, SpatialLeiden 50
+#   PC: 30      -> all of them use 30 (Step 3 then computes 30)
+PC: default
 
 # Available clustering algorithms
 algorithms:
@@ -57,18 +96,33 @@ algorithms:
   SpatialLeiden: null
   stlearn: null
 
-# Clustering parameters (Seurat & BANKSY)
+# Seurat graph clustering (louvain, louvain_refine, SLM, leiden)
 clustering:
-  resolution: 0.5   # generic resolution for Seurat clustering
-  nrep: 1000        # BayesSpace MCMC repetitions
-  burn_in: 100      # BayesSpace MCMC burn-in
-  q: 10             # BayesSpace number of clusters
-  lambda: 0.2       # 0:non-spatial clustering; 0.2:cell typing; 0.8:domain segmentation
-  k_geom: 50        # Banksy-specific k_geom
+  resolution: 3     # FindClusters resolution
+
+# BANKSY (rule cluster_BANKSY reads this block; optimize_parameter.py writes BANKSY trials here)
+BANKSY:
+  resolution: 3         # clustering resolution
+  lambda: 0.1           # 0: non-spatial, 0.2: cell typing, 0.8: domain segmentation
+  k_geom: 25            # geometric neighbours
+  use_agf: false        # Asymmetric Gaussian Function neighbour weighting (pair with M > 0)
+  M: null               # azimuthal Fourier harmonic order (only meaningful when use_agf: true)
+  spatial_mode: kNN_median  # kNN_median, kNN_mean, kNN_r, kNN_rn, rNN_gauss, kNN_unif
+  k_neighbors: 50       # sNN graph neighbours (k.param in FindNeighbors)
+
+# BayesSpace (rule cluster_BayesSpace reads this block; optimize_parameter.py writes BayesSpace trials here)
+BayesSpace:
+  q: 20                 # number of spatial clusters
+  nrep: 3000            # MCMC iterations
+  burn_in: 500          # MCMC burn-in steps
+  gamma: 1              # spatial smoothing parameter
+  model: t              # error model: t (robust, handles outlier spots) or normal
+  init_method: mclust   # MCMC initialisation: mclust (GMM, better) or kmeans (faster)
+  precision: equal      # covariance structure: equal (shared) or variable (per-cluster)
 
 # SpaGCN-specific parameters
 SpaGCN:
-  n_clusters: 10
+  n_clusters: 13
   beta: 49
   alpha: 1
   refine: true
@@ -76,26 +130,37 @@ SpaGCN:
 
 # stLearn–specific parameters
 stlearn:
-  n_neighbors: 10
-  n_pcs: 50
+  n_neighbors: 6
   resolution: 1.0
   use_morphology: false
+  sme_weights: physical_distance   # SME weights. Without histology (use_morphology: false) only physical_distance or
+                                   # weights_matrix_pd_gd apply. All options: weights_matrix_all, weights_matrix_pd_gd,
+                                   # weights_matrix_pd_md, weights_matrix_gd_md,
+                                   # physical_distance, morphological_distance,
+                                   # gene_expression_correlation
+  clustering_method: louvain       # louvain or kmeans
+  n_clusters: null                 # required when clustering_method: kmeans
+  use_localization: false          # DBSCAN spatial sub-clustering after initial clustering
+  localization_eps: 20.0           # DBSCAN epsilon radius (spatial units)
+  localization_min_samples: 1      # DBSCAN min_samples
 
 # SpatialPCA–specific parameters
 SpatialPCA:
-  n_clusters: 10      # desired number of clusters
+  n_clusters: 25      # desired number of clusters
   refine: false       # if true, set fast=FALSE; if false, fast=TRUE
 
 # SpatialLeiden-specific parameters
 SpatialLeiden:
-  n_neighbors: 10           # k for latent graph (same intent as stlearn n_neighbors)
-  n_pcs: 30                 # number of PCs to compute / use
-  resolution: 2.5           # default latent resolution
+  n_neighbors: 6           # k for latent graph (same intent as stlearn n_neighbors)
+  resolution: 3.5           # default latent resolution
   layer_ratio: 1.8          # weighting between expression and spatial layers
   coord_type: "generic"     # passed to squidpy.gr.spatial_neighbors: "generic" or "grid"
   directed: false           # directed graph flag for
-  refine: true              # if true, run resolution search to match n_clusters
-  search_n_clusters: 15   # optional: if provided, tune resolution to produce this # clusters
+  refine: false             # if true, run resolution search to match n_clusters
+  search_n_clusters: 16    # optional: if provided, tune resolution to produce this # clusters
+  use_weights: [true, true] # edge weights for [latent, spatial] layers
+  search_start: [1.0, 0.4]  # starting resolution for [latent, spatial] search
+  n_leiden_iter: -1         # Leiden iterations (-1 = run until convergence)
 
 # Whether to save the final annotated Seurat RDS file
 save_annotation_rds: true

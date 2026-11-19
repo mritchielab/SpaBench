@@ -126,16 +126,21 @@ spe <- logNormCounts(spe)
 assayNames(spe)
 # set seed for reproducibility
 set.seed(123)
-# using a single thread in this example
-spe <- nnSVG(spe)
+spe <- nnSVG(spe, n_threads = 1)
 table(rowData(spe)$padj <= 0.05)
 rowData(spe)[rowData(spe)$padj <= 0.05, ]
 
 # add SVG back to seu object
-VariableFeatures(seu) <- rownames(rowData(spe)[rowData(spe)$padj <= 0.05, ])[1:opt$n_features]
+# Keep significant genes in nnSVG rank order (not genome order), at most n_features, no NA padding
+rd <- rowData(spe)
+rd <- rd[!is.na(rd$padj) & rd$padj <= 0.05, , drop = FALSE]
+VariableFeatures(seu) <- head(rownames(rd)[order(rd$rank)], opt$n_features)
 write.csv(VariableFeatures(seu), opt$hvg_csv, row.names=FALSE)
 saveRDS(seu, opt$output)
 
 # plot variable features
 p <- VariableFeaturePlot(seu)
 ggsave(opt$plot_png, p)
+
+
+

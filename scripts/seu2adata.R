@@ -7,12 +7,12 @@ library(rhdf5)
 assay <- DefaultAssay(seu)
 VariableFeatures(seu, assay = assay) <- SpatiallyVariableFeatures(seu, assay= assay, selection.method=feat)
 
-SaveH5Seurat(seu, filename = "/vast/projects/SpatialTranscriptomicsBenchmarking/test.h5Seurat")
-Convert("/vast/projects/SpatialTranscriptomicsBenchmarking/test.h5Seurat", dest = "h5ad")
+SaveH5Seurat(seu, filename = "/vast/projects/SpatialTranscriptomicsBenchmarking/Snakemake_workflow/data/HCC/test.h5Seurat")
+Convert("/vast/projects/SpatialTranscriptomicsBenchmarking/Snakemake_workflow/data/HCC/test.h5Seurat", dest = "h5ad")
 
 SaveH5Seurat(
-  seu_sct,
-  filename     = "/vast/projects/SpatialTranscriptomicsBenchmarking/test_sct.h5Seurat",
+  seu,
+  filename     = "/vast/projects/SpatialTranscriptomicsBenchmarking/data/HCC/seu.h5Seurat",
   overwrite     = TRUE,
   write.data   = TRUE,
   assay        = c("Spatial"),
@@ -48,7 +48,7 @@ seu
 # 4. 再用 SeuratDisk 把表达矩阵写入 .h5Seurat
 SaveH5Seurat(
   seu,
-  filename     = "/vast/projects/SpatialTranscriptomicsBenchmarking/test_v3Spatial.h5Seurat",
+  filename     = "/vast/projects/SpatialTranscriptomicsBenchmarking/data/HCC/test_v3Spatial.h5Seurat",
   overwrite     = TRUE,
   assay        = "Spatial",    # 现在这个 Spatial 已经是 v3 assay 了
   write.data   = TRUE,
@@ -109,7 +109,7 @@ seu@meta.data  <- md[, c("in_tissue", "array_row", "array_col")]
 # （5）保存为 v3‐compatible h5Seurat，extra 把 images 和我们填好的 obs/var 一并存入
 SaveH5Seurat(
   object       = seu,
-  filename     = "/vast/projects/SpatialTranscriptomicsBenchmarking/out_v3Spatial.h5Seurat",
+  filename     = "/vast/projects/SpatialTranscriptomicsBenchmarking/data/HCC/out_v3Spatial.h5Seurat",
   overwrite    = TRUE,
   assay        = "Spatial",
   write.data   = TRUE,
@@ -139,3 +139,27 @@ seu@meta.data$array_col <- coords[rownames(seu@meta.data), "col"]
 seu@meta.data$orig.ident <- NULL
 seu$nCount_Spatial3 <- NULL
 seu$nFeature_Spatial3 <- NULL
+
+
+
+
+Convert("/vast/projects/SpatialTranscriptomicsBenchmarking/Data/Mouse_embryo_stereoseq/E10.5_E1S1.MOSTA.h5ad", 
+        dest = "h5seurat", overwrite = TRUE, verbose = TRUE, assay = "Spatial")
+seu <- LoadH5Seurat("/vast/projects/SpatialTranscriptomicsBenchmarking/Data/Mouse_embryo_stereoseq/E10.5_E1S1.MOSTA.h5seurat", assays = "Spatial", image = FALSE)
+barcodes <- rownames(seu@meta.data)
+nums_list <- regmatches(barcodes, gregexpr("\\d+", barcodes))
+coords <- as.data.frame(do.call(rbind, lapply(nums_list, function(v) {
+  v <- as.numeric(v)
+  if(length(v) >= 2) v[1:2] else c(NA, NA)
+})))
+colnames(coords) <- c("imagecol","imagerow")
+coords$row <- coords$imagerow
+coords$col <- coords$imagecol
+rownames(coords) <- rownames(seu@meta.data)
+
+seu[['slice1']] <- new(
+  Class = 'SlideSeq',
+  assay = "Spatial",
+  coordinates = coords)
+SpatialDimPlot(seu)
+

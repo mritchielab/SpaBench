@@ -52,7 +52,7 @@ spark <- spark.test(spark,
 # 5) rank based on adjusted p value as top n_features
 res <- spark@res_mtest
 res <- res[order(res[ , "adjusted_pvalue"]), , drop = FALSE]
-top_genes <- rownames(res)[1:opt$n_features]
+top_genes <- head(rownames(res), opt$n_features)   # [1:n] padded the list with NA when fewer genes passed SPARK's filter
 
 # 6) assign SVG selected by SPARK to Seurat
 VariableFeatures(seu) <- top_genes

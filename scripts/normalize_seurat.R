@@ -12,7 +12,6 @@ option_list <- list(
   make_option("--output",      type="character", help="Output normalized RDS"),
   make_option("--method",      type="character", help="Normalization method"),
   make_option("--scale_factor",type="numeric",   help="Scale factor"),
-  make_option("--counts_csv",  type="character", help="CSV of normalized counts"),
   make_option("--plot_png",    type="character", help="PNG file for violin plots")
 )
 opt <- parse_args(OptionParser(option_list = option_list))
@@ -27,6 +26,35 @@ raw <- readRDS(opt$input)
 #                     assay="Spatial",
 #                     normalization.method = opt$method,
 #                     scale.factor        = opt$scale_factor)
+# ==============================================================================
+# ### NEW: VISIUM HD SPECIFIC TISSUE FILTERING
+# ==============================================================================
+if (!is.null(opt$platform) && opt$platform == "VisiumHD") {
+  message("Detected VisiumHD: Filtering for in-tissue bins...")
+  
+  # Check if slice1 exists and contains the tissue column
+  if ("slice1" %in% names(raw@images)) {
+    coords <- raw@images$slice1@coordinates
+    if ("tissue" %in% colnames(coords)) {
+      in_tissue_barcodes <- rownames(coords[coords$tissue == 1, ])
+      raw <- subset(raw, cells = in_tissue_barcodes)
+      message("Kept ", length(in_tissue_barcodes), " in-tissue bins.")
+    } else {
+      warning("Tissue column not found in coordinates. Skipping tissue filter.")
+    }
+  } else {
+    warning("Image 'slice1' not found. Skipping tissue filter.")
+  }
+}
+
+# ### NEW: GLOBAL ZERO-COUNT FILTER
+# This prevents log(0) errors (Inf/-Inf) in LogNormalize and SCTransform
+raw$nCount_Spatial <- colSums(GetAssayData(raw, assay = "Spatial", slot = "counts"))
+if (any(raw$nCount_Spatial == 0)) {
+  message("Removing bins with zero total counts to prevent normalization errors...")
+  raw <- subset(raw, subset = nCount_Spatial > 0)
+}
+# ==============================================================================**
 if (opt$method %in% c("LogNormalize", "CLR")) {
   # LogNormalize / CLR 
   seu <- NormalizeData(
@@ -57,12 +85,6 @@ if (opt$method %in% c("LogNormalize", "CLR")) {
   stop("Unsupported normalization method: ", opt$method)
 }
 # Export counts before/after
-write.csv(as.data.frame(GetAssayData(raw, slot = "counts")),
-          file = sub("\\.rds$", "_raw_counts.csv", opt$output),
-          row.names = TRUE)
-write.csv(as.data.frame(GetAssayData(seu, slot = "data")),
-          file = opt$counts_csv,
-          row.names = TRUE)
 
 # Save normalized object
 saveRDS(seu, file = opt$output)

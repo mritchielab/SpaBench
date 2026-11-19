@@ -21,17 +21,18 @@ files <- list.files(
   recursive  = TRUE,
   full.names = TRUE
 )
+# The pattern also matches 09_<alg>_cluster_metrics.csv (main route); keep the SingleR files only
+files <- files[!grepl("_cluster_metrics\\.csv$", files)]
 
 # 2. 读取并打上标签（从路径中提取 norm/feat/red/alg）
 df_list <- lapply(files, function(f) {
   parts <- strsplit(f, "/")[[1]]
-  # parts: ".../results/{sample}/{norm}/{feat}/{red}/{alg}/09_{alg}_metrics.csv"
-  n <- tail(parts, 6)
+  # parts: ".../results/{sample}/{norm}/{feat}/{alg}/09_{alg}_metrics.csv"
+  n <- tail(parts, 4)
   tibble(
-    norm   = n[2],
-    feat   = n[3],
-    red    = n[4],
-    alg    = n[5],
+    norm   = n[1],
+    feat   = n[2],
+    alg    = n[3],
     read.csv(f, stringsAsFactors=FALSE)
   )
 })

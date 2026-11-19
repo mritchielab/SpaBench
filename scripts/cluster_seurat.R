@@ -8,6 +8,7 @@ opt<-parse_args(OptionParser(option_list=list(
   make_option("--output",     type="character"),
   make_option("--resolution", type="numeric"),
   make_option("--algorithm",  type="integer"),
+  make_option("--dims",       type="integer", default=10L, help="PCs used by FindNeighbors (Seurat default 10)"),
   make_option("--clustermethod",type="character",default="matrix"),
   make_option("--meta_csv",   type="character"),
   make_option("--plot_png",   type="character")
@@ -49,7 +50,9 @@ if (!(feat %in% c("vst", "nnSVG", "SPARK", "SPARK-X", "disp", "mvp"))) {
 }
 
 print(opt$algorithm)
-npcs<-ncol(Embeddings(seu,"pca"))
+npcs<-opt$dims
+if (npcs > ncol(Embeddings(seu,"pca"))) stop("--dims ", npcs, " but only ", ncol(Embeddings(seu,"pca")), " PCs in the reduced object")
+message("FindNeighbors on PCs 1:", npcs)
 seu<-FindNeighbors(seu,dims=1:npcs)
 seu<-FindClusters(seu,resolution=opt$resolution,algorithm=opt$algorithm,method=opt$clustermethod)
 write.csv(seu@meta.data,opt$meta_csv,row.names=TRUE)

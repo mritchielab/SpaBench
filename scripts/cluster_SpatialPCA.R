@@ -11,11 +11,13 @@ option_list <- list(
   make_option("--output",      type="character", help="Output clustered Seurat RDS"),
   make_option("--meta_csv",    type="character", help="Output CSV of cluster labels"),
   make_option("--plot_png",    type="character", help="PNG for cluster plot"),
-  make_option("--n_clusters",  type="integer",   default=7,    help="Number of clusters"),
+  make_option("--n_clusters",  type="integer",   default=20,    help="Number of clusters"),
   make_option("--gene_number", type="integer",   default=2000, help="Number of genes"),
-  make_option("--refine",      type="character",        help="If set, run refine step (fast=FALSE)")
+  make_option("--spatial_pcs", type="integer",   default=20,   help="Number of spatial PCs (SpatialPCnum; package default 20)"),
+  make_option("--refine",      type="character",        help="If TRUE, use fast=FALSE loadings/PCs and apply refine_cluster_10x; if FALSE, use fast=TRUE and skip refine_cluster_10x")
 )
 opt <- parse_args(OptionParser(option_list=option_list))
+do_refine <- isTRUE(as.logical(opt$refine))
 
 # 1. Load Seurat object
 seu <- readRDS(opt$input)
@@ -52,17 +54,41 @@ colnames(coords_df) <- c("x_coord","y_coord")
 coords <- as.matrix(coords_df)
 assay <- DefaultAssay(seu)
 
-# 4. Build SpatialPCA object
-SPCA_obj <- CreateSpatialPCAObject(
-  counts     = as.matrix(GetAssayData(seu, assay = assay, slot = "counts")),
-  location   = coords,
-  project    = "SpatialPCA",
-  gene.type  = "custom",
-  gene.number = opt$gene_number,
-  customGenelist = VariableFeatures(seu)
-  #min.locations  = 20,
-  #min.features   = 20
-)
+# 4. Build SpatialPCA object from the WORKFLOW's normalised values.
+# CreateSpatialPCAObject() would re-normalise the raw counts with its own
+# SCTransform (so the Step-1 normalisation would have no effect) and drop spots
+# with < 20 detected genes. Instead we build the object directly and set
+# normalized_expr to the row-scaled 'data' layer of the default assay
+# (= Step-1 normalisation) for the selected genes, which is exactly the slot
+# SpatialPCA_buildKernel / EstimateLoading read (SpatialPCA 1.3.0 source:
+# CreateSpatialPCAObject stores centred SCT scale.data there and buildKernel
+# row-scales object@normalized_expr into object@params$expr).
+genes <- VariableFeatures(seu, assay = assay)
+norm_data <- GetAssayData(seu, assay = assay, layer = "data")
+genes <- intersect(as.character(genes), rownames(norm_data))
+if (length(genes) == 0) stop("None of the selected features are in the '", assay, "' data layer")
+expr <- as.matrix(norm_data[genes, , drop = FALSE])
+rm(norm_data)
+# zero-variance genes cannot be scaled (NaN) -> drop them
+gene_sd <- apply(expr, 1, sd)
+if (any(!is.finite(gene_sd) | gene_sd == 0)) {
+  message(sprintf("Dropping %d constant genes", sum(!is.finite(gene_sd) | gene_sd == 0)))
+  expr <- expr[is.finite(gene_sd) & gene_sd > 0, , drop = FALSE]
+}
+expr <- t(scale(t(expr)))
+spots <- intersect(colnames(expr), rownames(coords))
+expr <- expr[, spots, drop = FALSE]
+coords <- coords[spots, , drop = FALSE]
+message(sprintf("SpatialPCA input: '%s' assay data layer (normalisation of this workflow), %d genes x %d spots",
+                assay, nrow(expr), ncol(expr)))
+
+SPCA_obj <- new(Class = "SpatialPCA",
+                counts   = as(GetAssayData(seu, assay = assay, layer = "counts")[rownames(expr), spots, drop = FALSE], "dgCMatrix"),
+                location = coords,
+                project  = "SpatialPCA")
+SPCA_obj@normalized_expr <- expr
+SPCA_obj@params <- list()
+rm(expr)
 
 SPCA_obj <- SpatialPCA_buildKernel(
   SPCA_obj,
@@ -72,15 +98,15 @@ SPCA_obj <- SpatialPCA_buildKernel(
 )
 
 # 5. Estimate loadings & compute Spatial PCs
-fast_flag <- if (opt$refine) FALSE else TRUE
 SPCA_obj <- SpatialPCA_EstimateLoading(
   SPCA_obj,
-  fast         = fast_flag,
-  SpatialPCnum = opt$n_clusters * 3  # or use config["pca"]["npcs"] if preferred
+  fast         = !do_refine,
+  SpatialPCnum = opt$spatial_pcs
 )
+message("SpatialPCA: ", opt$spatial_pcs, " spatial PCs")
 SPCA_obj <- SpatialPCA_SpatialPCs(
   SPCA_obj,
-  fast = fast_flag
+  fast = !do_refine
 )
 
 # 6. Clustering
@@ -92,19 +118,23 @@ clusterlabel <- walktrap_clustering(
 )
 
 # optionally refine
-clusterlabel <- refine_cluster_10x(
+if (do_refine) {
+  clusterlabel <- refine_cluster_10x(
     clusterlabels = clusterlabel,
     location      = SPCA_obj@location,
     shape         = "hexagon"
   )
+}
 
 # 7. Attach results to Seurat
-seu@meta.data$SpatialPCA <- factor(clusterlabel)
+# SpatialPCs columns follow colnames(normalized_expr) (= spots)
+cl <- setNames(as.character(clusterlabel), spots)
+seu@meta.data$SpatialPCA <- factor(cl[rownames(seu@meta.data)])
 
 # 8. Save outputs
 saveRDS(seu, opt$output)
 write.csv(
-  data.frame(spot=rownames(seu@meta.data), SpatialPCA=clusterlabel),
+  data.frame(spot=spots, SpatialPCA=clusterlabel),
   file = opt$meta_csv, row.names = FALSE
 )
 

@@ -1,5 +1,16 @@
 # scripts/select_features.R
 #!/usr/bin/env Rscript
+# Highly variable feature selection with Seurat's mean.var.plot (mvp) or
+# dispersion (disp) statistics.
+#
+#  * Both statistics are computed explicitly from the assay's data layer
+#    (Seurat:::DISP / CalcDispersion), so the named method is applied for every
+#    assay type, including SCTAssay (where FindVariableFeatures() would silently
+#    dispatch to the SCT method and ignore selection.method).
+#  * mvp : genes ranked by scaled dispersion (mvp.dispersion.scaled), top n_features.
+#  * disp: genes ranked by dispersion (mvp.dispersion), top n_features.
+#  * The statistics assume log-scale input. For RC (non-log) data a log1p copy
+#    is used for ranking only; the stored data layer is never modified.
 suppressPackageStartupMessages({
   library(optparse)
   library(Seurat)
@@ -14,38 +25,53 @@ option_list <- list(
   make_option("--plot", type="character")
 )
 opt <- parse_args(OptionParser(option_list=option_list))
+
+method <- opt$method
+if (method %in% c("mean.var.plot", "mvp")) {
+  method <- "mean.var.plot"
+} else if (method %in% c("dispersion", "disp")) {
+  method <- "dispersion"
+} else {
+  stop("Unsupported --method '", opt$method, "' (expected mean.var.plot or dispersion)")
+}
+
 seu <- readRDS(opt$input)
 assay <- DefaultAssay(seu)
-if (!is.null(seu@commands$NormalizeData.Spatial) && seu@commands$NormalizeData.Spatial@params$normalization.method == 'RC'){
-  mat <- GetAssayData(seu, assay=assay, slot="data")
+message("Assay: ", assay, " (class ", class(seu[[assay]])[1], "); method: ", method)
+
+# Local copy of the data layer used only for ranking
+mat <- LayerData(seu, assay = assay, layer = "data")
+if (!inherits(mat, "dgCMatrix")) mat <- as(as.matrix(mat), "CsparseMatrix")
+is_rc <- !is.null(seu@commands$NormalizeData.Spatial) &&
+  identical(seu@commands$NormalizeData.Spatial@params$normalization.method, "RC")
+if (is_rc) {
+  message("RC normalisation detected: ranking on a log1p copy of the data layer (stored data unchanged)")
   mat <- log1p(mat)
-  if ("layers" %in% slotNames(seu[[assay]])) {
-    seu[[assay]]@layers$data <- mat
-  } else {
-    seu[[assay]]$data <- mat
-  }
 }
-seu <- ScaleData(seu, assay=assay, verbose=TRUE)
-seu <- tryCatch({
-  message("Running FindVariableFeatures on native Assay5...")
-  FindVariableFeatures(seu, selection.method = opt$method, nfeatures = opt$n_features)
-  
-}, error = function(e) {
-  # If the above fails, e.g., "argument 1 is not a vector"
-  message("Assay5 selection failed. Casting to legacy Assay for compatibility...")
-  
-  # 3. Cast the specific assay to the v3/v4 'Assay' class then back to 'Assay5' to maintain v5 workflow
-  seu[[assay]] <- as(object = seu[[assay]], Class = "Assay")
-  seu[[assay]] <- as(object = seu[[assay]], Class = "Assay5")
-  
-  # 4. Run the selection on the legacy object
-  seu <- FindVariableFeatures(seu, selection.method = opt$method, nfeatures = opt$n_features)
-  
-  return(seu)
-})
-write.csv(VariableFeatures(seu), opt$hvg_csv, row.names=FALSE)
+
+hvf <- Seurat:::CalcDispersion(object = mat, verbose = FALSE)
+score_col <- if (method == "mean.var.plot") "mvp.dispersion.scaled" else "mvp.dispersion"
+score <- hvf[[score_col]]
+names(score) <- rownames(hvf)
+expressed <- Matrix::rowSums(mat != 0) > 0
+score <- score[expressed[names(score)] & is.finite(score)]
+selected <- head(names(sort(score, decreasing = TRUE)), opt$n_features)
+rm(mat)
+message("Selected ", length(selected), " features (requested ", opt$n_features,
+        ", rankable ", length(score), ")")
+
+VariableFeatures(seu[[assay]]) <- selected
+stopifnot(identical(VariableFeatures(seu), selected))
+
+write.csv(selected, opt$hvg_csv, row.names=FALSE)
 saveRDS(seu, opt$output)
 
-# plot variable features
-p <- VariableFeaturePlot(seu)
+# plot mean vs dispersion, highlighting selected features
+hvf$selected <- rownames(hvf) %in% selected
+p <- ggplot(hvf, aes(x = mvp.mean, y = .data[[score_col]], colour = selected)) +
+  geom_point(size = 0.5) +
+  scale_colour_manual(values = c(`FALSE` = "grey60", `TRUE` = "red")) +
+  labs(x = "Average expression (mvp.mean)", y = score_col,
+       title = sprintf("%s: %d selected features (%s assay)", method, length(selected), assay)) +
+  theme_bw()
 ggsave(opt$plot, p)

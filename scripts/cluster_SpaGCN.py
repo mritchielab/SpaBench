@@ -10,6 +10,11 @@ import matplotlib.pyplot as plt
 import cv2
 import subprocess
 import torch
+# norm_data.py lives next to this script; append its directory explicitly because
+# `python -P` (used for SpatialLeiden) does not put the script directory on sys.path
+import os as _os, sys as _sys
+_sys.path.append(_os.path.dirname(_os.path.abspath(__file__)))
+from norm_data import read_feature_list, apply_normalized  # noqa: E402
 
 warnings.filterwarnings("ignore")
 
@@ -18,6 +23,9 @@ def main():
     parser.add_argument("--raw_h5ad",   required=True, help="原始 AnnData (.h5ad)")
     parser.add_argument("--positions",  required=True, help="无表头位置 CSV")
     parser.add_argument("--features",   required=True, help="feature list CSV")
+    parser.add_argument("--norm_h5",    required=True,
+                        help="Normalised expression of this workflow (02_<norm>_normalized.h5, "
+                             "written by scripts/export_normalized.R)")
     parser.add_argument("--out_rds",    required=True, help="输出 Seurat RDS 路径")
     parser.add_argument("--out_csv",    required=True, help="输出 cluster CSV 路径")
     parser.add_argument("--out_png",    required=True, help="输出空间图 PNG 路径")
@@ -31,34 +39,37 @@ def main():
     parser.add_argument("--beta",       type=int, default=49,   help="Beta value for histology (default 49)")
     parser.add_argument("--alpha",      type=float, default=1.0, help="Alpha value for histology (default 1)")
     parser.add_argument("--n_clusters", type=int, default=7,    help="Number of clusters (default 7)")
+    parser.add_argument("--num_pcs",    type=int, default=50,   help="PCs computed inside SpaGCN.train (package default 50)")
+    parser.add_argument("--platform",   type=str, default="Visium", help="Visium (hexagonal grid) or other (square grid)")
     parser.add_argument("--p_res",      type=float, default=0.5, help="p value for searching l (default 0.5)")
 
     args = parser.parse_args()
 
-    # 1. 读 AnnData
+    # 1. 读 AnnData (raw; only used for spot barcodes / obs)
     adata = sc.read_h5ad(args.raw_h5ad)
     adata.var_names_make_unique()
 
-    # 2. 读无表头位置文件 & Map Coordinates
+    # 2. Replace X by THIS workflow's normalised values for ITS selected genes
+    #    (spots restricted to those present in the normalised object).
+    #    No further library-size normalisation / log1p is applied below.
+    feats = read_feature_list(args.features)
+    adata = apply_normalized(adata, args.norm_h5, feats)
+
+    # 3. 读无表头位置文件 & Map Coordinates (after the spot subset, so they line up)
     # 假设列结构: 0=barcode, 1=flag, 2=x_array, 3=y_array, 4=x_pixel, 5=y_pixel
-    # Pandas read_csv index_col=0 implies: 
-    # DataFrame col 1='flag', 2='x_array', 3='y_array', 4='x_pixel', 5='y_pixel'
     pos = pd.read_csv(args.positions, header=None, index_col=0)
-    
+    pos.index = pos.index.astype(str) # Ensure index is string type
+    missing_pos = adata.obs_names.difference(pos.index)
+    if len(missing_pos):
+        raise ValueError(f"{len(missing_pos)} spots have no entry in {args.positions}")
+
     # Load Pixel Coordinates (for training)
     adata.obs["x_pixel"] = pos[4].loc[adata.obs_names].values
     adata.obs["y_pixel"] = pos[5].loc[adata.obs_names].values
-    
+
     # Load Array Coordinates (for refinement - critical per tutorial)
     adata.obs["x_array"] = pos[2].loc[adata.obs_names].values
     adata.obs["y_array"] = pos[3].loc[adata.obs_names].values
-
-    # 3. 读 feature list 并 subset
-    feats = pd.read_csv(args.features, header=None, dtype=str)[0]
-    keep = [g for g in feats if g in adata.var_names]
-    if not keep:
-        raise ValueError("No features matched var_names")
-    adata = adata[:, keep].copy()
 
     # 4. 计算邻接矩阵 (Training Adjacency)
     x_pixel = adata.obs["x_pixel"].tolist()
@@ -86,14 +97,8 @@ def main():
             histology=False
         )
 
-    # 5. 预过滤 & 归一化
-    adata.var_names_make_unique()
-    spg.prefilter_genes(adata, min_cells=3)
-    spg.prefilter_specialgenes(adata)
-    
-    # Tutorial uses normalize_per_cell (or normalize_total) before log1p
-    sc.pp.normalize_total(adata) 
-    sc.pp.log1p(adata)
+    # 5. No prefilter / normalize_total / log1p: adata.X already holds the
+    #    workflow's normalised values (Step 1) for its selected genes (Step 2).
 
     # 6. 搜索 l (using p from args)
     l = spg.search_l(args.p_res, adj, start=0.01, end=1000, tol=0.01, max_run=100)
@@ -101,7 +106,7 @@ def main():
     # 7. 搜索 res (using n_clusters from args)
     res = spg.search_res(
         adata, adj, l, args.n_clusters,
-        start=0.7, step=0.1, tol=5e-3, lr=0.05, 
+        start=0.7, step=0.1, tol=5e-3, lr=0.05,
         max_epochs=20, r_seed=100, t_seed=100, n_seed=100
     )
 
@@ -111,6 +116,7 @@ def main():
     random.seed(100); torch.manual_seed(100); np.random.seed(100)
     clf.train(
         adata, adj,
+        num_pcs=min(args.num_pcs, adata.n_vars - 1, adata.n_obs - 1),
         init_spa=True, init="louvain",
         res=res, tol=5e-3, lr=0.05, max_epochs=200
     )
@@ -134,7 +140,7 @@ def main():
             sample_id=adata.obs_names.tolist(),
             pred=adata.obs["pred"].tolist(),
             dis=adj_2d,     # Uses the array-coordinate specific adjacency
-            shape="hexagon" # Assuming Visium/Hexagon as per standard SpaGCN usage
+            shape="hexagon" if args.platform.lower() == "visium" else "square"  # Visium spots are hexagonal; HD / Stereo-seq bins are square
         )
         adata.obs["refined_pred"] = [str(r) for r in refined]
         final_col = "refined_pred"

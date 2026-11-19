@@ -17,6 +17,7 @@ option_list <- list(
   make_option("--clusters",    type="character", help="Clustering CSV"),
   make_option("--truth",       type="character", help="Ground-truth TSV"),
   make_option("--seurat_out",  type="character", help="Output annotated Seurat RDS"),
+  make_option("--save_rds", type="character", default="True", help="Whether to save annotated RDS"),
   make_option("--plot_seurat", type="character", help="Output spatial annotation PNG")
 )
 opt <- parse_args(OptionParser(option_list=option_list))
@@ -69,7 +70,9 @@ if (grepl("^[0-9]+_[0-9]+", rn[1])) {
 }
 
 if (is.null(image_coords) || any(is.na(image_coords))) {
-  stop("CRITICAL ERROR: No valid spatial coordinates found for this platform.")
+  image_coords <- seu@reductions$Xspatial_@cell.embeddings
+  colnames(image_coords) <- c("x", "y")
+  #stop("CRITICAL ERROR: No valid spatial coordinates found for this platform.")
 }
 
 # --- CLUSTER COLUMN IDENTIFICATION ---
@@ -103,8 +106,8 @@ if (length(intersect(colnames(seu), truth_df$barcode)) == 0) {
   message("Exact barcode match failed. Attempting to harmonize suffixes...")
   
   # Strip -1 or _1 common in Visium/Squidpy
-  seu_clean <- sub("[-_][0-9]$|-[0-9]$|_[0-9]$", "", colnames(seu))
-  truth_clean <- sub("[-_][0-9]$|-[0-9]$|_[0-9]$", "", truth_df$barcode)
+  seu_clean <- sub("-[0-9]+$", "", colnames(seu))
+  truth_clean <- sub("-[0-9]+$", "", truth_df$barcode)
   
   if (length(intersect(seu_clean, truth_clean)) > 0) {
     # 1. Update Seurat cell names
@@ -115,7 +118,7 @@ if (length(intersect(colnames(seu), truth_df$barcode)) == 0) {
     
     # 3. Update internal dataframes
     truth_df$barcode <- truth_clean
-    clust_df$barcode <- sub("[-_][0-9]$|-[0-9]$|_[0-9]$", "", clust_df$barcode)
+    clust_df$barcode <- sub("-[0-9]+$", "", clust_df$barcode)
     
     # 4. CRITICAL FIX: Sync the spatial coordinate rownames with new barcodes
     rownames(image_coords) <- seu_clean
@@ -181,8 +184,15 @@ for (tc in truth_cols) {
 }
 
 # 7. Save and Plot
-dir.create(dirname(opt$seurat_out), showWarnings = FALSE, recursive = TRUE)
-saveRDS(seu, file = opt$seurat_out)
+if (tolower(opt$save_rds) %in% c("true", "yes", "1")) {
+  dir.create(dirname(opt$seurat_out), showWarnings = FALSE, recursive = TRUE)
+  saveRDS(seu, file = opt$seurat_out)
+  message("Saved annotated Seurat object to: ", opt$seurat_out)
+} else {
+  dir.create(dirname(opt$seurat_out), showWarnings = FALSE, recursive = TRUE)
+  writeLines("Annotation RDS saving skipped by config.", opt$seurat_out)
+  message("Wrote placeholder to: ", opt$seurat_out, " (save_rds disabled)")
+}
 
 for (tc in truth_cols) {
   meta_col <- paste0('annotation_', tc)
@@ -192,7 +202,7 @@ for (tc in truth_cols) {
       p <- SpatialDimPlot(seu, group.by = meta_col, label = TRUE) + 
         labs(title = paste('Cell Type Annotation (Ref:', tc, ')'))
       
-      plot_path <- sub('\\.(rds)$', paste0('_', tc, '.png'), opt$plot_seurat)
+      plot_path <- sub('\\.png$', paste0('_', tc, '.png'), opt$plot_seurat)
       dir.create(dirname(plot_path), showWarnings = FALSE, recursive = TRUE)
       ggsave(plot_path, p, width = 16, height = 14)
     }
